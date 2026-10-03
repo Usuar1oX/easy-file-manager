@@ -8,7 +8,7 @@ return [
     // Usuarios que pueden acceder al sistema
     // 'usuario' => 'contraseña'
     'users' => [
-        'admin' => 'admin123'
+        'admin' => 'admin'
     ],
 
     // Tamaño máximo de subida
