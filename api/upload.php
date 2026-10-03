@@ -51,8 +51,7 @@ function sanitizePath($path) {
 $file = $_FILES['file'];
 $pathParam = isset($_POST['path']) ? trim($_POST['path'], '/') : '';
 $pathParam = sanitizePath($pathParam);
-$targetPath = resolveSecureParentPath($pathParam === '' ? '' : $pathParam . '/placeholder');
-$targetPath = $targetPath !== false ? dirname($targetPath) : false;
+$targetPath = resolveSecureParentPath($pathParam);
 
 if ($targetPath === false) {
     http_response_code(400);
