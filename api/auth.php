@@ -11,15 +11,18 @@ if ($method === 'POST') {
     $attemptsFile = sys_get_temp_dir() . '/login_attempts.json';
     
     $attemptsData = [];
+    $currentTime = time();
+    $ipData = ['count' => 0, 'time' => $currentTime];
+    $lockAcquired = false;
     $fp = @fopen($attemptsFile, 'c+');
     if ($fp !== false && flock($fp, LOCK_EX)) {
+        $lockAcquired = true;
         $filesize = filesize($attemptsFile);
         if ($filesize > 0) {
             $json = fread($fp, $filesize);
             $attemptsData = json_decode($json, true) ?: [];
         }
         
-        $currentTime = time();
         $ipData = $attemptsData[$ip] ?? ['count' => 0, 'time' => $currentTime];
         
         if ($currentTime - $ipData['time'] > 900) {
@@ -50,7 +53,7 @@ if ($method === 'POST') {
     }
 
     if ($authenticated) {
-        if (isset($fp)) {
+        if ($lockAcquired && $fp !== false) {
             $attemptsData[$ip] = ['count' => 0, 'time' => time()];
             ftruncate($fp, 0);
             rewind($fp);
@@ -62,7 +65,7 @@ if ($method === 'POST') {
         $_SESSION['user'] = $username;
         echo json_encode(['success' => true, 'message' => 'Logged in successfully']);
     } else {
-        if (isset($fp)) {
+        if ($lockAcquired && $fp !== false) {
             $ipData['count']++;
             $attemptsData[$ip] = $ipData;
             ftruncate($fp, 0);
