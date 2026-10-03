@@ -58,6 +58,13 @@ foreach ($rawSegments as $seg) {
 }
 $pathParam = implode('/', $segments);
 
+// 1) Rechaza con 403 si la ruta destino es oculta
+if (isHiddenPath($pathParam)) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Acceso denegado a rutas ocultas']);
+    exit;
+}
+
 // 1) La ruta destino NO debe pasar por sanitizeName.
 // Usa la ruta tal como llega y valídala con resolveSecurePath().
 // Si la carpeta existe, sube ahí respetando mayúsculas.
@@ -161,7 +168,34 @@ if (!in_array(strtolower($extension), $allowedExtensions) || $originalName === '
 }
 
 $success = false;
-$finalName = $filenameWithoutExt . ($extension ? '.' . $extension : '');
+
+// 1) Determinar nombre final preliminar
+if ($isImage) {
+    $finalName = $filenameWithoutExt . '.webp';
+} else {
+    $finalName = $filenameWithoutExt . ($extension ? '.' . $extension : '');
+}
+
+// 1) Rechaza con 403 si el nombre final del archivo es oculto
+if (empty($finalName) || isHiddenItem($finalName)) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Acceso denegado a archivos ocultos']);
+    exit;
+}
+
+// 2) No sobrescribas archivos existentes: si ya existe en la carpeta destino, agrega sufijo -1, -2, etc.
+$finalPath = $targetPath . '/' . $finalName;
+if (file_exists($finalPath)) {
+    $info = pathinfo($finalName);
+    $baseName = $info['filename'];
+    $ext = isset($info['extension']) && $info['extension'] !== '' ? '.' . $info['extension'] : '';
+    $counter = 1;
+    while (file_exists($targetPath . '/' . $baseName . '-' . $counter . $ext)) {
+        $counter++;
+    }
+    $finalName = $baseName . '-' . $counter . $ext;
+    $finalPath = $targetPath . '/' . $finalName;
+}
 
 if ($isImage) {
     // Es una imagen: la convertimos a WebP y redimensionamos
@@ -203,9 +237,6 @@ if ($isImage) {
             $width, $height
         );
 
-        $finalName = $filenameWithoutExt . '.webp';
-        $finalPath = $targetPath . '/' . $finalName;
-
         $success = imagewebp($destinationImage, $finalPath, 80);
 
         imagedestroy($sourceImage);
@@ -216,8 +247,7 @@ if ($isImage) {
         exit;
     }
 } else {
-    // No es imagen (ej. PDF, Word, Zip). Solo lo movemos a la carpeta de destino original.
-    $finalPath = $targetPath . '/' . $finalName;
+    // No es imagen (ej. PDF, Word, Zip). Solo lo movemos a la carpeta de destino.
     $success = move_uploaded_file($file['tmp_name'], $finalPath);
 }
 
