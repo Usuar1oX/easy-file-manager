@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 session_start();
 
 // ConfiguraciÃ³n de CORS para desarrollo (permitir Vite)

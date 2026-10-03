@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // Configuración de Easy File Manager
 return [
     // Directorio donde se guardan los archivos (relativo a la carpeta api)
