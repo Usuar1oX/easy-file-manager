@@ -187,7 +187,7 @@
                     if (typeof feather !== 'undefined') feather.replace();
                 } catch (e) {}
                 
-                // Prevenir que el navegador abra la imagen si se suelta fuera del ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡rea
+                // Prevenir que el navegador abra la imagen si se suelta fuera del área
                 window.addEventListener('dragover', (e) => e.preventDefault());
                 window.addEventListener('drop', (e) => e.preventDefault());
                 
@@ -309,7 +309,7 @@
 
                 banner.classList.remove('hidden');
                 bannerText.innerHTML = `Mostrando <b>${filtered.length}</b> de <b>${this.currentItems.length}</b> en esta carpeta para <i>"${this.escapeHtml(query)}"</i>`;
-                globalBtn.innerHTML = `<span>Buscar en todo el catálogo</span> <kbd class="bg-white border border-blue-200 rounded px-1.5 py-0.5 text-[10px] text-neutral-500 font-mono">ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµ Enter</kbd>`;
+                globalBtn.innerHTML = `<span>Buscar en todo el catálogo</span> <kbd class="bg-white border border-blue-200 rounded px-1.5 py-0.5 text-[10px] text-neutral-500 font-mono">↵ Enter</kbd>`;
                 globalBtn.onclick = () => this.searchGlobal(query);
 
                 this.renderItems(filtered);
@@ -334,7 +334,7 @@
                 const globalBtn = document.getElementById('searchGlobalBtn');
                 banner.classList.remove('hidden');
                 bannerText.innerHTML = `Buscando en todas las carpetas: <i>"${this.escapeHtml(query)}"</i>...`;
-                globalBtn.innerHTML = `<span>ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ Salir de búsqueda</span>`;
+                globalBtn.innerHTML = `<span>✕ Salir de búsqueda</span>`;
                 globalBtn.onclick = () => this.clearSearch();
 
                 this.renderBreadcrumbs();
@@ -622,7 +622,7 @@
                 if (this.isSearchMode && item.directory) {
                     locationHtml = `
                         <span class="text-[10px] text-neutral-400 truncate max-w-full hover:text-neutral-600 mt-0.5 cursor-pointer hover:underline relative z-10" title="Carpeta: /${item.directory}" onclick="event.stopPropagation(); app.navigateTo('${item.directory}')">
-                            ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â /${item.directory}
+                            📁 /
                         </span>
                     `;
                 }
@@ -887,7 +887,7 @@
 
             async deleteBulk() {
                 if (this.selectedItems.length === 0) return;
-                if (!confirm(`¿Estás seguro de que deseas eliminar ${this.selectedItems.length} elemento(s)? Esta acciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n no se puede deshacer.`)) return;
+                if (!confirm(`¿Estás seguro de que deseas eliminar ${this.selectedItems.length} elemento(s)? Esta acción no se puede deshacer.`)) return;
                 
                 const itemsToDelete = [...this.selectedItems];
                 this.clearSelection();
@@ -1037,7 +1037,7 @@
                     try { if (typeof feather !== 'undefined') feather.replace(); } catch(e){}
                 }
                 
-                title.textContent = `OperaciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n completada`;
+                title.textContent = `Operación completada`;
                 document.getElementById('uploadProgress').classList.add('hidden');
                 this.refreshView();
             },

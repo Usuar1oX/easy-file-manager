@@ -1,23 +1,15 @@
 <?php
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path' => '/',
+    'domain' => $_SERVER['HTTP_HOST'],
+    'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+    'httponly' => true,
+    'samesite' => 'Lax'
+]);
 session_start();
 
-// ConfiguraciÃ³n de CORS para desarrollo (permitir Vite)
-if (isset($_SERVER['HTTP_ORIGIN'])) {
-    header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
-    header('Access-Control-Allow-Credentials: true');
-    header('Access-Control-Max-Age: 86400');    // cache for 1 day
-}
-
-// Access-Control headers are received during OPTIONS requests
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD']))
-        header("Access-Control-Allow-Methods: GET, POST, OPTIONS, DELETE");
-    if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS']))
-        header("Access-Control-Allow-Headers: {$_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS']}");
-    exit(0);
-}
-
-// Cargar configuraciÃ³n desde config.json
+// Cargar configuración desde config.php
 $configFile = __DIR__ . '/config.php';
 if (!file_exists($configFile)) {
     header('Content-Type: application/json');
@@ -28,7 +20,7 @@ if (!file_exists($configFile)) {
 
 $config = require $configFile;
 
-// ConfiguraciÃ³n general
+// Configuración general
 define('MEDIA_DIR', __DIR__ . '/' . ($config['media_dir'] ?? '../../media'));
 define('MAX_FILE_SIZE', $config['max_file_size'] ?? 50 * 1024 * 1024); // 50MB
 define('RESIZE_THRESHOLD', $config['resize_threshold'] ?? 5 * 1024 * 1024); // 5MB
@@ -48,5 +40,24 @@ function requireAuth() {
         echo json_encode(['error' => 'Unauthorized']);
         exit;
     }
+}
+
+function resolveSecurePath($path) {
+    $mediaReal = realpath(MEDIA_DIR);
+    if ($mediaReal === false) return false;
+    $pathReal = realpath(MEDIA_DIR . '/' . $path);
+    if ($pathReal === false) return false;
+    if (strpos($pathReal, $mediaReal) !== 0) return false;
+    return $pathReal;
+}
+
+function resolveSecureParentPath($path) {
+    $mediaReal = realpath(MEDIA_DIR);
+    if ($mediaReal === false) return false;
+    $parent = dirname(MEDIA_DIR . '/' . $path);
+    $parentReal = realpath($parent);
+    if ($parentReal === false) return false;
+    if (strpos($parentReal, $mediaReal) !== 0) return false;
+    return MEDIA_DIR . '/' . ltrim($path, '/');
 }
 

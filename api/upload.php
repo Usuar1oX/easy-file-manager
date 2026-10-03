@@ -49,24 +49,24 @@ function sanitizePath($path) {
 }
 
 $file = $_FILES['file'];
-$pathParam = isset($_POST['path']) ? $_POST['path'] : '';
-$pathParam = str_replace(['../', '..\\'], '', $pathParam);
-$pathParam = trim($pathParam, '/');
+$pathParam = isset($_POST['path']) ? trim($_POST['path'], '/') : '';
 $pathParam = sanitizePath($pathParam);
+$targetPath = resolveSecurePath($pathParam === '' ? '' : $pathParam);
 
-$targetPath = MEDIA_DIR;
-if ($pathParam !== '') {
-    $targetPath .= '/' . $pathParam;
+if ($targetPath === false) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid upload path']);
+    exit;
 }
 
 if (!is_dir($targetPath)) {
-    mkdir($targetPath, 0777, true);
+    mkdir($targetPath, 0755, true);
 }
 
 // Validar tamaÃ±o
 if ($file['size'] > MAX_FILE_SIZE) {
     http_response_code(400);
-    echo json_encode(['error' => 'File exceeds maximum size of 10MB']);
+    echo json_encode(['error' => 'File exceeds maximum size of ' . (MAX_FILE_SIZE / 1024 / 1024) . 'MB']);
     exit;
 }
 
@@ -77,17 +77,17 @@ $filenameWithoutExt = sanitizeName(pathinfo($originalName, PATHINFO_FILENAME));
 $mimeType = mime_content_type($file['tmp_name']);
 $isImage = in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp']);
 
-// Lista de extensiones prohibidas por seguridad (nunca subir cÃ³digo ejecutable al server)
-$dangerousExtensions = ['php', 'php3', 'php4', 'php5', 'phtml', 'phar', 'exe', 'sh', 'bat', 'cmd', 'cgi', 'pl'];
+// Lista blanca de extensiones
+$allowedExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'zip', 'mp4', 'txt'];
 
-if (in_array(strtolower($extension), $dangerousExtensions)) {
+if (!in_array(strtolower($extension), $allowedExtensions) || $originalName === '.htaccess') {
     http_response_code(400);
-    echo json_encode(['error' => 'Tipo de archivo no permitido por seguridad.']);
+    echo json_encode(['error' => 'Tipo de archivo no permitido.']);
     exit;
 }
 
 $success = false;
-$finalName = $filenameWithoutExt . ($extension ? '.' . $extension : ''); // Por defecto mantenemos el nombre original pero sanitizado
+$finalName = $filenameWithoutExt . ($extension ? '.' . $extension : '');
 
 if ($isImage) {
     // Es una imagen: la convertimos a WebP y redimensionamos

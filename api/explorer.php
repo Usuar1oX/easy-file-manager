@@ -33,7 +33,7 @@ function deleteDir($dirPath) {
 
 function copyDir($src, $dst) {
     if (is_dir($src)) {
-        if (!is_dir($dst)) mkdir($dst, 0777, true);
+        if (!is_dir($dst)) mkdir($dst, 0755, true);
         $files = scandir($src);
         foreach ($files as $file) {
             if ($file != "." && $file != "..") {
@@ -48,8 +48,8 @@ function copyDir($src, $dst) {
 function normalizeSearchText($text) {
     $lower = mb_strtolower($text, 'UTF-8');
     return strtr($lower, [
-        'Ã¡'=>'a', 'Ã©'=>'e', 'Ã­'=>'i', 'Ã³'=>'o', 'Ãº'=>'u', 'Ã¼'=>'u', 'Ã±'=>'n',
-        'Ã'=>'a', 'Ã‰'=>'e', 'Ã'=>'i', 'Ã“'=>'o', 'Ãš'=>'u', 'Ãœ'=>'u', 'Ã‘'=>'n'
+        'á'=>'a', 'é'=>'e', 'í'=>'i', 'ó'=>'o', 'ú'=>'u', 'ü'=>'u', 'ñ'=>'n',
+        'Á'=>'a', 'É'=>'e', 'Í'=>'i', 'Ó'=>'o', 'Ú'=>'u', 'Ü'=>'u', 'Ñ'=>'n'
     ]);
 }
 
@@ -178,7 +178,14 @@ if ($method === 'GET') {
     // Limpiar nombre
     $folderName = preg_replace('/[^a-zA-Z0-9_\-]/', '', $folderName);
     
-    $newFolderPath = $targetPath . '/' . $folderName;
+    $intendedPath = $pathParam === '' ? $folderName : $pathParam . '/' . $folderName;
+    $newFolderPath = resolveSecureParentPath($intendedPath);
+    
+    if ($newFolderPath === false) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid folder path']);
+        exit;
+    }
     
     if (is_dir($newFolderPath)) {
         http_response_code(400);
@@ -186,7 +193,7 @@ if ($method === 'GET') {
         exit;
     }
     
-    if (mkdir($newFolderPath, 0777, true)) {
+    if (mkdir($newFolderPath, 0755, true)) {
         echo json_encode(['success' => true, 'message' => 'Folder created']);
     } else {
         http_response_code(500);
@@ -232,8 +239,17 @@ if ($method === 'GET') {
         exit;
     }
 
-    $parentDir = dirname($targetPath);
-    $newPath = $parentDir . '/' . $newName;
+    $basePath = dirname($pathParam === '' ? 'root' : $pathParam);
+    if ($basePath === '.' || $basePath === '\') $basePath = '';
+    
+    $intendedNewPath = $basePath === '' ? $newName : $basePath . '/' . $newName;
+    $newPath = resolveSecureParentPath($intendedNewPath);
+    
+    if ($newPath === false) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid new name path']);
+        exit;
+    }
     
     if (file_exists($newPath)) {
         http_response_code(400);
@@ -259,16 +275,22 @@ if ($method === 'GET') {
         exit;
     }
 
-    $sourcePath = str_replace(['../', '..\\'], '', $sourcePath);
-    $sourcePath = trim($sourcePath, '/');
+    $fullSourcePath = resolveSecurePath($sourcePath);
+    if ($fullSourcePath === false) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid source path']);
+        exit;
+    }
     
-    $targetDir = str_replace(['../', '..\\'], '', $targetDir);
-    $targetDir = trim($targetDir, '/');
-
-    $fullSourcePath = MEDIA_DIR . '/' . $sourcePath;
-    $fullTargetDir = MEDIA_DIR;
-    if ($targetDir !== '') {
-        $fullTargetDir .= '/' . $targetDir;
+    $fullTargetDir = resolveSecurePath($targetDir === '' ? '' : $targetDir);
+    if ($fullTargetDir === false) {
+        if ($targetDir === '') {
+            $fullTargetDir = realpath(MEDIA_DIR);
+        } else {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid target directory']);
+            exit;
+        }
     }
 
     if (!file_exists($fullSourcePath)) {

@@ -1,0 +1,7 @@
+# Bloquear la ejecución de scripts PHP y otros en la carpeta de subidas
+<FilesMatch "\.(php|php3|php4|php5|phtml|pl|py|jsp|asp|htm|html|shtml|sh|cgi)$">
+    Deny from all
+</FilesMatch>
+
+# Opcional: forzar que los archivos se descarguen en lugar de interpretarse
+# AddType application/octet-stream .php .php3 .php4 .php5 .phtml

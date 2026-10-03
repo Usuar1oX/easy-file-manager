@@ -1,4 +1,4 @@
-﻿Write-Host "Deploying files from Local Repo to E:\..." -ForegroundColor Cyan
+Write-Host "Deploying files from Local Repo to E:\..." -ForegroundColor Cyan
 
 # Directorio origen (repositorio local)
 $sourceDir = "$PSScriptRoot"
@@ -11,7 +11,7 @@ $filesToDeploy = @(
     "index.html",
     "api\auth.php",
     "api\core.php",
-    "api\config.php",
+    "api\hash.php",
     "api\explorer.php",
     "api\upload.php"
 )
