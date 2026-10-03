@@ -47,7 +47,7 @@ function resolveSecurePath($path) {
     if ($mediaReal === false) return false;
     $pathReal = realpath(MEDIA_DIR . '/' . $path);
     if ($pathReal === false) return false;
-    if (strpos($pathReal, $mediaReal) !== 0) return false;
+    if ($pathReal !== $mediaReal && strpos($pathReal, $mediaReal . DIRECTORY_SEPARATOR) !== 0) return false;
     return $pathReal;
 }
 
@@ -57,7 +57,6 @@ function resolveSecureParentPath($path) {
     $parent = dirname(MEDIA_DIR . '/' . $path);
     $parentReal = realpath($parent);
     if ($parentReal === false) return false;
-    if (strpos($parentReal, $mediaReal) !== 0) return false;
+    if ($parentReal !== $mediaReal && strpos($parentReal, $mediaReal . DIRECTORY_SEPARATOR) !== 0) return false;
     return MEDIA_DIR . '/' . ltrim($path, '/');
 }
-

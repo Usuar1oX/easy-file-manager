@@ -6,22 +6,33 @@ header('Content-Type: application/json');
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'POST') {
-    // Límite de intentos
+    // Límite de intentos persistente por IP
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    $rateLimitKey = "login_attempts_$ip";
-    if (!isset($_SESSION[$rateLimitKey])) {
-        $_SESSION[$rateLimitKey] = ['count' => 0, 'time' => time()];
-    }
+    $attemptsFile = sys_get_temp_dir() . '/login_attempts.json';
     
-    if (time() - $_SESSION[$rateLimitKey]['time'] > 900) {
-        // Reset after 15 minutes
-        $_SESSION[$rateLimitKey] = ['count' => 0, 'time' => time()];
-    }
-    
-    if ($_SESSION[$rateLimitKey]['count'] >= 5) {
-        http_response_code(429);
-        echo json_encode(['success' => false, 'error' => 'Demasiados intentos. Espera 15 minutos.']);
-        exit;
+    $attemptsData = [];
+    $fp = fopen($attemptsFile, 'c+');
+    if (flock($fp, LOCK_EX)) {
+        $filesize = filesize($attemptsFile);
+        if ($filesize > 0) {
+            $json = fread($fp, $filesize);
+            $attemptsData = json_decode($json, true) ?: [];
+        }
+        
+        $currentTime = time();
+        $ipData = $attemptsData[$ip] ?? ['count' => 0, 'time' => $currentTime];
+        
+        if ($currentTime - $ipData['time'] > 900) {
+            $ipData = ['count' => 0, 'time' => $currentTime];
+        }
+        
+        if ($ipData['count'] >= 5) {
+            flock($fp, LOCK_UN);
+            fclose($fp);
+            http_response_code(429);
+            echo json_encode(['success' => false, 'error' => 'Demasiados intentos. Espera 15 minutos.']);
+            exit;
+        }
     }
 
     $data = json_decode(file_get_contents('php://input'), true);
@@ -39,12 +50,27 @@ if ($method === 'POST') {
     }
 
     if ($authenticated) {
-        $_SESSION[$rateLimitKey]['count'] = 0;
+        if (isset($fp)) {
+            $attemptsData[$ip] = ['count' => 0, 'time' => time()];
+            ftruncate($fp, 0);
+            rewind($fp);
+            fwrite($fp, json_encode($attemptsData));
+            flock($fp, LOCK_UN);
+            fclose($fp);
+        }
         session_regenerate_id(true);
         $_SESSION['user'] = $username;
         echo json_encode(['success' => true, 'message' => 'Logged in successfully']);
     } else {
-        $_SESSION[$rateLimitKey]['count']++;
+        if (isset($fp)) {
+            $ipData['count']++;
+            $attemptsData[$ip] = $ipData;
+            ftruncate($fp, 0);
+            rewind($fp);
+            fwrite($fp, json_encode($attemptsData));
+            flock($fp, LOCK_UN);
+            fclose($fp);
+        }
         http_response_code(401);
         echo json_encode(['success' => false, 'error' => 'Invalid credentials']);
     }

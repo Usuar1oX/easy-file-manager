@@ -7,16 +7,18 @@ header('Content-Type: application/json');
 $method = $_SERVER['REQUEST_METHOD'];
 $pathParam = isset($_GET['path']) ? $_GET['path'] : '';
 // Evitar Directory Traversal
-$pathParam = str_replace(['../', '..\\'], '', $pathParam);
+
 $pathParam = trim($pathParam, '/');
 
-$targetPath = MEDIA_DIR;
-if ($pathParam !== '') {
-    $targetPath .= '/' . $pathParam;
+$targetPath = resolveSecurePath($pathParam === '' ? '' : $pathParam);
+if ($targetPath === false && $method !== 'POST' && $method !== 'PUT') {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid path']);
+    exit;
 }
 
 if (!is_dir(MEDIA_DIR)) {
-    mkdir(MEDIA_DIR, 0777, true);
+    mkdir(MEDIA_DIR, 0755, true);
 }
 
 function deleteDir($dirPath) {
@@ -200,9 +202,14 @@ if ($method === 'GET') {
         echo json_encode(['error' => 'Failed to create folder']);
     }
 } else if ($method === 'DELETE') {
-    if (empty($pathParam) || !file_exists($targetPath)) {
+    if (empty($pathParam) || $targetPath === false || !file_exists($targetPath)) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid path']);
+        exit;
+    }
+    if (realpath($targetPath) === realpath(MEDIA_DIR)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Cannot delete root media directory']);
         exit;
     }
     
@@ -223,7 +230,7 @@ if ($method === 'GET') {
     $data = json_decode(file_get_contents('php://input'), true);
     $newName = $data['newName'] ?? '';
     
-    if (empty($newName) || empty($pathParam) || !file_exists($targetPath)) {
+    if (empty($newName) || empty($pathParam) || $targetPath === false || !file_exists($targetPath)) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid data']);
         exit;
@@ -240,7 +247,7 @@ if ($method === 'GET') {
     }
 
     $basePath = dirname($pathParam === '' ? 'root' : $pathParam);
-    if ($basePath === '.' || $basePath === '\') $basePath = '';
+    if ($basePath === '.' || $basePath === '\\') $basePath = '';
     
     $intendedNewPath = $basePath === '' ? $newName : $basePath . '/' . $newName;
     $newPath = resolveSecureParentPath($intendedNewPath);

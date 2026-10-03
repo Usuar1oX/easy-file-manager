@@ -14,14 +14,14 @@ if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
     $errCode = isset($_FILES['file']) ? $_FILES['file']['error'] : 'NO_FILE';
     $errMsg = 'Error desconocido';
     switch ($errCode) {
-        case UPLOAD_ERR_INI_SIZE: $errMsg = 'El archivo supera el lÃ­mite en php.ini (upload_max_filesize)'; break;
-        case UPLOAD_ERR_FORM_SIZE: $errMsg = 'El archivo supera el lÃ­mite del formulario html'; break;
-        case UPLOAD_ERR_PARTIAL: $errMsg = 'El archivo se subiÃ³ parcialmente'; break;
-        case UPLOAD_ERR_NO_FILE: $errMsg = 'No se subiÃ³ ningÃºn archivo'; break;
+        case UPLOAD_ERR_INI_SIZE: $errMsg = 'El archivo supera el límite en php.ini (upload_max_filesize)'; break;
+        case UPLOAD_ERR_FORM_SIZE: $errMsg = 'El archivo supera el límite del formulario html'; break;
+        case UPLOAD_ERR_PARTIAL: $errMsg = 'El archivo se subió parcialmente'; break;
+        case UPLOAD_ERR_NO_FILE: $errMsg = 'No se subió ningún archivo'; break;
         case UPLOAD_ERR_NO_TMP_DIR: $errMsg = 'Falta la carpeta temporal en el servidor'; break;
         case UPLOAD_ERR_CANT_WRITE: $errMsg = 'No se pudo escribir en el disco del servidor'; break;
-        case UPLOAD_ERR_EXTENSION: $errMsg = 'Una extensiÃ³n de PHP detuvo la subida'; break;
-        case 'NO_FILE': $errMsg = 'El archivo no llegÃ³ al servidor (probablemente supera post_max_size)'; break;
+        case UPLOAD_ERR_EXTENSION: $errMsg = 'Una extensión de PHP detuvo la subida'; break;
+        case 'NO_FILE': $errMsg = 'El archivo no llegó al servidor (probablemente supera post_max_size)'; break;
     }
     http_response_code(400);
     echo json_encode(['error' => $errMsg]);
@@ -31,7 +31,7 @@ if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
 function sanitizeName($name) {
     $name = mb_strtolower($name, 'UTF-8');
     $name = strtr($name, [
-        'Ã¡'=>'a', 'Ã©'=>'e', 'Ã­'=>'i', 'Ã³'=>'o', 'Ãº'=>'u', 'Ã¼'=>'u', 'Ã±'=>'n'
+        'á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ü'=>'u','ñ'=>'n','Á'=>'a','É'=>'e','Í'=>'i','Ó'=>'o','Ú'=>'u','Ü'=>'u','Ñ'=>'n'
     ]);
     $name = str_replace([' ', '_'], '-', $name);
     $name = preg_replace('/[^a-z0-9\-\.]/', '', $name);
@@ -51,7 +51,8 @@ function sanitizePath($path) {
 $file = $_FILES['file'];
 $pathParam = isset($_POST['path']) ? trim($_POST['path'], '/') : '';
 $pathParam = sanitizePath($pathParam);
-$targetPath = resolveSecurePath($pathParam === '' ? '' : $pathParam);
+$targetPath = resolveSecureParentPath($pathParam === '' ? '' : $pathParam . '/placeholder');
+$targetPath = $targetPath !== false ? dirname($targetPath) : false;
 
 if ($targetPath === false) {
     http_response_code(400);
@@ -63,7 +64,7 @@ if (!is_dir($targetPath)) {
     mkdir($targetPath, 0755, true);
 }
 
-// Validar tamaÃ±o
+// Validar tamaño
 if ($file['size'] > MAX_FILE_SIZE) {
     http_response_code(400);
     echo json_encode(['error' => 'File exceeds maximum size of ' . (MAX_FILE_SIZE / 1024 / 1024) . 'MB']);

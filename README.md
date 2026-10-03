@@ -5,13 +5,13 @@ Un gestor de archivos e imágenes minimalista, rápido y moderno en un solo arch
 ## Instalación
 
 1. Sube el contenido de este repositorio a tu servidor web (soporte para PHP 7.4+ requerido).
-2. Entra a la carpeta \api\.
-3. Renombra o copia el archivo \config.example.php\ a \config.php\.
-4. Edita \config.php\ y cambia el nombre de usuario y contraseña por defecto.
-5. (Opcional) Cambia la ruta \media_dir\ en \config.php\ para decidir dónde se guardan físicamente los archivos. Por defecto los guardará en la misma carpeta raíz.
+2. Entra a la carpeta `api/`.
+3. Renombra o copia el archivo `config.example.php` a `config.php`.
+4. Edita `config.php` y cambia el nombre de usuario y contraseña por defecto.
+5. (Opcional) Cambia la ruta `media_dir` en `config.php` para decidir dónde se guardan físicamente los archivos. Por defecto los guardará en la misma carpeta raíz.
 
 ## Estructura
-- \index.html\: Toda la interfaz de usuario en una Single Page Application.
+- `index.html`: Toda la interfaz de usuario en una Single Page Application.
 - \api/\: Los endpoints de backend en PHP.
 
 ## Características
@@ -24,8 +24,11 @@ Un gestor de archivos e imágenes minimalista, rápido y moderno en un solo arch
 ## Generar contraseñas
 Para agregar usuarios, puedes generar el hash seguro de sus contraseñas ejecutando desde la línea de comandos:
 
-``bash
+```bash
 php api/hash.php "miclave"
-``
+```
 
-Luego, copia el hash resultante y pégalo en el array 'users' de pi/config.php.
+Luego, copia el hash resultante y pégalo en el array 'users' de api/config.php.
+
+## Protección de subidas
+Debes proteger el directorio donde se suben las imágenes para evitar ejecución de scripts. Copia el archivo `media.htaccess` de la raíz del proyecto y pégalo como `.htaccess` dentro de la carpeta de subidas de tu servidor web.
