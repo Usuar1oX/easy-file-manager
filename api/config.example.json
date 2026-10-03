@@ -1,0 +1,9 @@
+{
+    "media_dir": "../../media",
+    "max_file_size": 52428800,
+    "resize_threshold": 5242880,
+    "max_width": 1920,
+    "users": {
+        "admin": "admin"
+    }
+}

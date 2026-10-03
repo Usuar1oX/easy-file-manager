@@ -1,0 +1,1273 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Imagenes Easy Way</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <style>
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-neutral-50 text-neutral-900 font-sans min-h-screen flex flex-col">
+    <div id="app" class="flex flex-col flex-1">
+        <header class="bg-white border-b border-neutral-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10 hidden" id="mainHeader">
+            <div class="flex items-center gap-3">
+                <div class="bg-neutral-900 text-white p-2 rounded-lg">
+                    <i data-feather="image" class="w-5 h-5"></i>
+                </div>
+                <h1 class="text-xl font-bold tracking-tight">Imagenes Easy Way</h1>
+            </div>
+            <button onclick="app.logout()" class="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-800 transition-colors">
+                <i data-feather="log-out" class="w-4 h-4"></i> Cerrar Sesión
+            </button>
+        </header>
+
+        <!-- LOGIN VIEW -->
+        <div id="loginView" class="min-h-screen flex items-center justify-center p-4 hidden">
+            <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-neutral-200">
+                <div class="flex justify-center mb-6">
+                    <div class="bg-neutral-900 text-white p-3 rounded-xl">
+                        <i data-feather="image" class="w-7 h-7"></i>
+                    </div>
+                </div>
+                <h1 class="text-2xl font-bold text-center mb-2">Imagenes Easy Way</h1>
+                <p class="text-center text-neutral-500 mb-8 text-sm">Ingresa para administrar los archivos</p>
+                <div id="loginError" class="hidden bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-medium"></div>
+                <form onsubmit="app.login(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-neutral-700">Usuario</label>
+                        <input type="text" id="username" required class="w-full p-3 rounded-lg border border-neutral-300 bg-neutral-50 focus:ring-2 focus:ring-neutral-900 outline-none transition-all" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-neutral-700">Contraseña</label>
+                        <input type="password" id="password" required class="w-full p-3 rounded-lg border border-neutral-300 bg-neutral-50 focus:ring-2 focus:ring-neutral-900 outline-none transition-all" />
+                    </div>
+                    <button type="submit" id="loginBtn" class="w-full bg-neutral-900 hover:bg-neutral-800 text-white font-medium p-3 rounded-lg transition-colors mt-2">
+                        Acceder
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- FILE MANAGER VIEW -->
+        <main id="fileManagerView" class="flex-1 flex flex-col p-6 max-w-7xl mx-auto w-full hidden">
+            <div class="flex flex-col flex-1 bg-white rounded-2xl shadow-sm border border-neutral-200 overflow-hidden relative">
+                <!-- TOOLBAR -->
+                <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 p-4 border-b border-neutral-100 bg-neutral-50/50">
+                    <div class="flex items-center text-sm font-medium overflow-x-auto whitespace-nowrap hide-scrollbar flex-1 mr-2" id="breadcrumb">
+                    </div>
+                    <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                        <div class="relative flex items-center flex-1 sm:flex-initial">
+                            <i data-feather="search" class="w-4 h-4 text-neutral-400 absolute left-3 pointer-events-none"></i>
+                            <input type="text" id="searchInput" placeholder="Buscar archivos..." class="pl-9 pr-8 py-1.5 text-sm bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent w-full sm:w-56 transition-all" oninput="app.onSearchInput(event)" onkeydown="app.onSearchKeydown(event)" />
+                            <button id="clearSearchBtn" onclick="app.clearSearch()" class="absolute right-2.5 text-neutral-400 hover:text-neutral-700 hidden" title="Limpiar búsqueda"><i data-feather="x" class="w-3.5 h-3.5"></i></button>
+                        </div>
+                        <form id="newFolderForm" onsubmit="app.createFolder(event)" class="items-center gap-2 hidden">
+                            <input type="text" id="newFolderName" placeholder="Nombre de carpeta" class="text-sm px-3 py-1.5 rounded-lg border border-neutral-300 focus:outline-none focus:border-neutral-500 w-36" />
+                            <button type="submit" class="bg-neutral-900 text-white text-xs px-3 py-2 rounded-lg font-medium">Crear</button>
+                            <button type="button" onclick="app.toggleNewFolder(false)" class="text-neutral-500 p-1 hover:text-neutral-900"><i data-feather="x" class="w-4 h-4"></i></button>
+                        </form>
+                        <div id="clipboardBar" class="hidden items-center bg-blue-50 border border-blue-200 rounded-lg shadow-sm text-sm font-medium text-blue-700 overflow-hidden">
+                            <button id="btnPaste" onclick="app.pasteFromClipboard()" class="flex items-center gap-1.5 px-3 py-1.5 hover:bg-blue-100/70 transition-colors" title="Pegar en la carpeta actual">
+                                <i data-feather="clipboard" class="w-4 h-4 text-blue-600"></i>
+                                <span id="pasteText" class="max-w-[140px] truncate">Pegar</span>
+                            </button>
+                            <div class="h-4 w-px bg-blue-200"></div>
+                            <button type="button" onclick="app.clearClipboard()" class="px-2 py-1.5 hover:bg-blue-100 text-blue-500 hover:text-red-600 transition-colors" title="Cancelar"><i data-feather="x" class="w-3.5 h-3.5"></i></button>
+                        </div>
+                        <button id="btnNewFolder" onclick="app.toggleNewFolder(true)" class="flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 bg-white border border-neutral-200 px-3 py-1.5 rounded-lg shadow-sm transition-all hover:shadow whitespace-nowrap" title="Crear nueva carpeta">
+                            <i data-feather="folder-plus" class="w-4 h-4"></i> <span class="hidden lg:inline">Nueva Carpeta</span>
+                        </button>
+                        <label class="flex items-center gap-2 text-sm font-medium text-neutral-600 bg-white border border-neutral-200 px-3 py-1.5 rounded-lg shadow-sm transition-all hover:bg-neutral-50 cursor-pointer whitespace-nowrap" title="Subir carpeta completa">
+                            <i data-feather="upload-cloud" class="w-4 h-4"></i> <span class="hidden lg:inline">Subir Carpeta</span>
+                            <input type="file" multiple webkitdirectory class="hidden" onchange="app.handleUpload(event.target.files)" />
+                        </label>
+                        <label class="flex items-center gap-2 text-sm font-medium text-white bg-neutral-900 px-3 py-1.5 rounded-lg shadow-sm transition-all hover:bg-neutral-800 cursor-pointer whitespace-nowrap">
+                            <i data-feather="upload" class="w-4 h-4"></i> <span>Subir</span>
+                            <input type="file" multiple class="hidden" onchange="app.handleUpload(event.target.files)" />
+                        </label>
+                    </div>
+                </div>
+                <!-- SEARCH INFO BANNER -->
+                <div id="searchBanner" class="bg-blue-50/60 border-b border-blue-100 px-4 py-2 text-xs flex items-center justify-between hidden">
+                    <span id="searchBannerText" class="text-neutral-700"></span>
+                    <button id="searchGlobalBtn" onclick="app.searchGlobal()" class="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1.5 hover:underline ml-2 shrink-0">
+                        <span>Buscar en todo el catálogo</span>
+                        <kbd class="bg-white border border-blue-200 rounded px-1.5 py-0.5 text-[10px] text-neutral-500 font-mono">↵ Enter</kbd>
+                    </button>
+                </div>
+                <!-- DRAG OVERLAY -->
+                <div id="dragOverlay" class="absolute inset-0 z-20 border-2 border-dashed border-blue-400 bg-blue-50/90 rounded-b-2xl items-center justify-center hidden pointer-events-none">
+                    <div class="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center pointer-events-none">
+                        <i data-feather="upload" class="w-12 h-12 text-blue-500 mb-4"></i>
+                        <p class="text-lg font-bold">Suelta aquí para subir</p>
+                        <p class="text-sm text-neutral-500">Se convertirán a WebP automáticamente</p>
+                    </div>
+                </div>
+                <!-- PROGRESS -->
+                <div id="uploadProgress" class="absolute inset-x-0 top-[61px] h-1 bg-neutral-100 overflow-hidden hidden z-10">
+                    <div class="h-full bg-blue-500 animate-[pulse_1s_ease-in-out_infinite]" style="width: 100%;"></div>
+                </div>
+                <!-- GRID -->
+                <div id="fileGrid" class="flex-1 p-6 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 content-start relative" ondragover="app.onDragOver(event)" ondragleave="app.onDragLeave(event)" ondrop="app.onDrop(event)">
+                </div>
+                <!-- EMPTY STATE -->
+                <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-neutral-400 pointer-events-none hidden">
+                    <i data-feather="folder" class="w-12 h-12 mb-4 opacity-50"></i>
+                    <p class="font-medium text-neutral-600">Esta carpeta está vacía</p>
+                    <p class="text-sm mt-1">Arrastra archivos aquí para subir</p>
+                </div>
+                <!-- LOADING -->
+                <div id="loadingState" class="absolute inset-0 flex items-center justify-center bg-white/80 z-10 hidden">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-900"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- BULK ACTIONS BAR -->
+        <div id="bulkActionBar" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white rounded-2xl shadow-2xl border border-neutral-200 px-4 py-3 flex items-center gap-3 z-40 transition-all translate-y-24 opacity-0 pointer-events-none">
+            <div class="flex items-center gap-2 pr-3 border-r border-neutral-200">
+                <span class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded-md" id="bulkCount">0</span>
+                <span class="text-sm font-medium text-neutral-600 hidden sm:inline">seleccionados</span>
+            </div>
+            <button onclick="app.copyToClipboardBulk('copy')" class="flex items-center gap-1.5 text-sm font-medium text-neutral-700 hover:text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"><i data-feather="copy" class="w-4 h-4"></i> <span class="hidden sm:inline">Copiar</span></button>
+            <button onclick="app.copyToClipboardBulk('cut')" class="flex items-center gap-1.5 text-sm font-medium text-neutral-700 hover:text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"><i data-feather="scissors" class="w-4 h-4"></i> <span class="hidden sm:inline">Mover</span></button>
+            <button onclick="app.deleteBulk()" class="flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"><i data-feather="trash-2" class="w-4 h-4"></i> <span class="hidden sm:inline">Eliminar</span></button>
+            <div class="w-px h-6 bg-neutral-200 ml-1"></div>
+            <button onclick="app.clearSelection()" class="text-neutral-400 hover:text-neutral-700 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors" title="Cancelar selección"><i data-feather="x" class="w-4 h-4"></i></button>
+        </div>
+
+        <!-- UPLOAD PROGRESS PANEL -->
+        <div id="uploadPanel" class="fixed bottom-6 right-6 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden flex flex-col hidden z-50">
+            <div class="bg-neutral-900 text-white px-4 py-3 flex justify-between items-center cursor-pointer" onclick="app.toggleUploadPanelBody()">
+                <h3 class="text-sm font-medium flex items-center gap-2"><i data-feather="upload-cloud" class="w-4 h-4"></i><span id="uploadPanelTitle">Subiendo archivos...</span></h3>
+                <button class="text-neutral-400 hover:text-white transition-colors" onclick="event.stopPropagation(); app.closeUploadPanel()"><i data-feather="x" class="w-4 h-4"></i></button>
+            </div>
+            <div id="uploadPanelBody" class="flex flex-col">
+                <div class="px-4 py-3 border-b border-neutral-100 bg-neutral-50">
+                    <div class="flex justify-between text-xs text-neutral-500 mb-1.5 font-medium">
+                        <span id="uploadPanelStatus">0 de 0 completados</span>
+                        <span id="uploadPanelPercent">0%</span>
+                    </div>
+                    <div class="w-full bg-neutral-200 rounded-full h-1.5 overflow-hidden">
+                        <div id="uploadPanelProgressBar" class="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div id="uploadPanelList" class="max-h-64 overflow-y-auto p-2 space-y-1 bg-white hide-scrollbar"></div>
+            </div>
+        </div>
+
+        <!-- LIGHTBOX -->
+        <div id="lightbox" class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm hidden" onclick="app.closeLightbox()">
+            <div id="lightboxActions" class="absolute top-4 right-4 flex flex-wrap justify-end gap-2 z-50 max-w-full pl-4 pr-12" onclick="event.stopPropagation()"></div>
+            <button id="lbPrev" onclick="app.prevImage(event)" class="absolute left-4 sm:left-12 z-50 text-white hover:text-neutral-300 bg-white/10 p-3 rounded-full backdrop-blur-md transition-all hover:bg-white/20 hidden"><i data-feather="chevron-left" class="w-8 h-8"></i></button>
+            <div class="flex flex-col items-center justify-center max-h-full max-w-full">
+                <img id="lightboxImg" src="" class="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl" onclick="event.stopPropagation()" />
+                <div id="lightboxUrl" class="mt-4 text-white/80 font-mono text-xs sm:text-sm bg-black/50 px-4 py-2 rounded-lg" onclick="event.stopPropagation()"></div>
+            </div>
+            <button id="lbNext" onclick="app.nextImage(event)" class="absolute right-4 sm:right-12 z-50 text-white hover:text-neutral-300 bg-white/10 p-3 rounded-full backdrop-blur-md transition-all hover:bg-white/20 hidden"><i data-feather="chevron-right" class="w-8 h-8"></i></button>
+        </div>
+    </div>
+    <script>const app = {
+            currentPath: '',
+            clipboard: { items: [], action: null },
+            imagesList: [],
+            currentImageIndex: -1,
+            currentItems: [],
+            isSearchMode: false,
+            searchQuery: '',
+            favorites: JSON.parse(localStorage.getItem('easyWayFavorites')) || [],
+            selectedItems: [],
+            
+            init() {
+                try {
+                    if (typeof feather !== 'undefined') feather.replace();
+                } catch (e) {}
+                
+                // Prevenir que el navegador abra la imagen si se suelta fuera del ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡rea
+                window.addEventListener('dragover', (e) => e.preventDefault());
+                window.addEventListener('drop', (e) => e.preventDefault());
+                
+                this.checkAuth();
+            },
+
+            async checkAuth() {
+                try {
+                    const res = await fetch('api/auth.php');
+                    const data = await res.json();
+                    if (data.authenticated) {
+                        this.showView('fileManager');
+                        this.loadFiles();
+                    } else {
+                        this.showView('login');
+                    }
+                } catch (e) {
+                    this.showView('login');
+                }
+            },
+
+            async login(e) {
+                e.preventDefault();
+                const btn = document.getElementById('loginBtn');
+                const err = document.getElementById('loginError');
+                err.classList.add('hidden');
+                btn.textContent = 'Iniciando...';
+                btn.disabled = true;
+
+                try {
+                    const res = await fetch('api/auth.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            username: document.getElementById('username').value,
+                            password: document.getElementById('password').value
+                        })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        this.showView('fileManager');
+                        this.loadFiles();
+                    } else {
+                        err.textContent = data.error || 'Credenciales inválidas';
+                        err.classList.remove('hidden');
+                    }
+                } catch (error) {
+                    err.textContent = 'Error de conexión';
+                    err.classList.remove('hidden');
+                } finally {
+                    btn.textContent = 'Acceder';
+                    btn.disabled = false;
+                }
+            },
+
+            async logout() {
+                await fetch('api/auth.php', { method: 'DELETE' });
+                this.showView('login');
+            },
+
+            showView(view) {
+                document.getElementById('loginView').classList.add('hidden');
+                document.getElementById('fileManagerView').classList.add('hidden');
+                document.getElementById('mainHeader').classList.add('hidden');
+                
+                if (view === 'login') {
+                    document.getElementById('loginView').classList.remove('hidden');
+                } else {
+                    document.getElementById('mainHeader').classList.remove('hidden');
+                    document.getElementById('fileManagerView').classList.remove('hidden');
+                }
+            },
+
+            onSearchInput(e) {
+                const query = e.target.value.trim();
+                const clearBtn = document.getElementById('clearSearchBtn');
+                if (query) {
+                    clearBtn.classList.remove('hidden');
+                } else {
+                    clearBtn.classList.add('hidden');
+                    if (this.isSearchMode) {
+                        this.clearSearch();
+                        return;
+                    }
+                }
+
+                if (this.isSearchMode) {
+                    return;
+                }
+
+                this.filterLocalItems(query);
+            },
+
+            onSearchKeydown(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const query = document.getElementById('searchInput').value.trim();
+                    if (query) {
+                        this.searchGlobal(query);
+                    }
+                } else if (e.key === 'Escape') {
+                    this.clearSearch();
+                }
+            },
+
+            filterLocalItems(query) {
+                const banner = document.getElementById('searchBanner');
+                const bannerText = document.getElementById('searchBannerText');
+                const globalBtn = document.getElementById('searchGlobalBtn');
+
+                if (!query) {
+                    banner.classList.add('hidden');
+                    this.renderItems(this.currentItems);
+                    return;
+                }
+
+                const lower = this.normalizeStr(query);
+                const filtered = this.currentItems.filter(item => this.normalizeStr(item.name).includes(lower));
+
+                banner.classList.remove('hidden');
+                bannerText.innerHTML = `Mostrando <b>${filtered.length}</b> de <b>${this.currentItems.length}</b> en esta carpeta para <i>"${this.escapeHtml(query)}"</i>`;
+                globalBtn.innerHTML = `<span>Buscar en todo el catálogo</span> <kbd class="bg-white border border-blue-200 rounded px-1.5 py-0.5 text-[10px] text-neutral-500 font-mono">ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµ Enter</kbd>`;
+                globalBtn.onclick = () => this.searchGlobal(query);
+
+                this.renderItems(filtered);
+            },
+
+            async searchGlobal(query) {
+                if (!query) query = document.getElementById('searchInput').value.trim();
+                if (!query) return;
+
+                this.isSearchMode = true;
+                this.searchQuery = query;
+                document.getElementById('searchInput').value = query;
+                document.getElementById('clearSearchBtn').classList.remove('hidden');
+
+                document.getElementById('loadingState').classList.remove('hidden');
+                document.getElementById('emptyState').classList.add('hidden');
+                const grid = document.getElementById('fileGrid');
+                grid.innerHTML = '';
+
+                const banner = document.getElementById('searchBanner');
+                const bannerText = document.getElementById('searchBannerText');
+                const globalBtn = document.getElementById('searchGlobalBtn');
+                banner.classList.remove('hidden');
+                bannerText.innerHTML = `Buscando en todas las carpetas: <i>"${this.escapeHtml(query)}"</i>...`;
+                globalBtn.innerHTML = `<span>ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ Salir de búsqueda</span>`;
+                globalBtn.onclick = () => this.clearSearch();
+
+                this.renderBreadcrumbs();
+
+                try {
+                    const res = await fetch('api/explorer.php?search=' + encodeURIComponent(query));
+                    if (res.ok) {
+                        const data = await res.json();
+                        const items = [
+                            ...(data.folders || []).map(f => ({...f, isDirectory: true})),
+                            ...(data.files || []).map(f => ({...f, isDirectory: false}))
+                        ];
+
+                        bannerText.innerHTML = `Resultados en todo el catálogo para <i>"${this.escapeHtml(query)}"</i>: <b>${items.length}</b> encontrado${items.length === 1 ? '' : 's'}`;
+                        this.renderItems(items);
+                    } else if (res.status === 401) {
+                        this.logout();
+                    } else {
+                        alert('Error al realizar la búsqueda');
+                    }
+                } catch (e) {
+                    console.error('Search error', e);
+                    alert('Error de conexión');
+                } finally {
+                    document.getElementById('loadingState').classList.add('hidden');
+                }
+            },
+
+            clearSearch() {
+                const input = document.getElementById('searchInput');
+                if (input) input.value = '';
+                const clearBtn = document.getElementById('clearSearchBtn');
+                if (clearBtn) clearBtn.classList.add('hidden');
+                const banner = document.getElementById('searchBanner');
+                if (banner) banner.classList.add('hidden');
+
+                const wasSearch = this.isSearchMode;
+                this.isSearchMode = false;
+                this.searchQuery = '';
+
+                if (wasSearch) {
+                    this.loadFiles();
+                } else {
+                    this.renderItems(this.currentItems);
+                }
+            },
+
+            toggleFavorite(path) {
+                const index = this.favorites.indexOf(path);
+                if (index > -1) {
+                    this.favorites.splice(index, 1);
+                } else {
+                    this.favorites.push(path);
+                }
+                localStorage.setItem('easyWayFavorites', JSON.stringify(this.favorites));
+                this.refreshView();
+            },
+
+            refreshView() {
+                if (this.isSearchMode) {
+                    this.searchGlobal(this.searchQuery);
+                } else {
+                    this.loadFiles();
+                }
+            },
+
+            normalizeStr(str) {
+                return (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+            },
+
+            escapeHtml(str) {
+                return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+            },
+
+            async loadFiles() {
+                if (this.isSearchMode) return;
+
+                document.getElementById('loadingState').classList.remove('hidden');
+                document.getElementById('emptyState').classList.add('hidden');
+                const grid = document.getElementById('fileGrid');
+                grid.innerHTML = '';
+                
+                this.renderBreadcrumbs();
+
+                try {
+                    const res = await fetch('api/explorer.php?path=' + encodeURIComponent(this.currentPath));
+                    if (res.ok) {
+                        const data = await res.json();
+                        this.currentItems = [
+                            ...(data.folders || []).map(f => ({...f, isDirectory: true})),
+                            ...(data.files || []).map(f => ({...f, isDirectory: false}))
+                        ];
+                        
+                        const query = document.getElementById('searchInput') ? document.getElementById('searchInput').value.trim() : '';
+                        if (query) {
+                            this.filterLocalItems(query);
+                        } else {
+                            this.renderItems(this.currentItems);
+                        }
+                    } else if (res.status === 401) {
+                        this.logout();
+                    } else {
+                        this.showView('login');
+                    }
+                } catch (e) {
+                    console.error('Error loading files', e);
+                    this.showView('login');
+                } finally {
+                    document.getElementById('loadingState').classList.add('hidden');
+                }
+            },
+
+            renderItems(items) {
+                const grid = document.getElementById('fileGrid');
+                grid.innerHTML = '';
+                const emptyState = document.getElementById('emptyState');
+
+                if (!items || items.length === 0) {
+                    if (this.isSearchMode) {
+                        emptyState.innerHTML = `
+                            <i data-feather="search" class="w-12 h-12 mb-4 opacity-50 text-neutral-400"></i>
+                            <p class="font-medium text-neutral-600">No se encontraron archivos ni carpetas</p>
+                            <p class="text-sm mt-1 text-neutral-400">Prueba con otra búsqueda o <button onclick="app.clearSearch()" class="text-blue-600 hover:underline">volver a ver todo</button></p>
+                        `;
+                    } else if (document.getElementById('searchInput') && document.getElementById('searchInput').value.trim()) {
+                        emptyState.innerHTML = `
+                            <i data-feather="search" class="w-12 h-12 mb-4 opacity-50 text-neutral-400"></i>
+                            <p class="font-medium text-neutral-600">No hay coincidencias en esta carpeta</p>
+                            <p class="text-sm mt-1 text-neutral-400">Presiona Enter o haz clic en "Buscar en todo el catálogo"</p>
+                        `;
+                    } else {
+                        emptyState.innerHTML = `
+                            <i data-feather="folder" class="w-12 h-12 mb-4 opacity-50 text-neutral-400"></i>
+                            <p class="font-medium text-neutral-600">Esta carpeta está vacía</p>
+                            <p class="text-sm mt-1 text-neutral-400">Arrastra archivos aquí para subir</p>
+                        `;
+                    }
+                    emptyState.classList.remove('hidden');
+                    try { if (typeof feather !== 'undefined') feather.replace(); } catch(e){}
+                } else {
+                    emptyState.classList.add('hidden');
+                    this.imagesList = items.filter(i => !i.isDirectory && i.url && i.name.match(/\.(webp|jpg|jpeg|png|gif)$/i));
+                    
+                    items.sort((a, b) => {
+                        const aFav = this.favorites.includes(a.path);
+                        const bFav = this.favorites.includes(b.path);
+                        if (aFav && !bFav) return -1;
+                        if (!aFav && bFav) return 1;
+                        if (a.isDirectory && !b.isDirectory) return -1;
+                        if (!a.isDirectory && b.isDirectory) return 1;
+                        return 0;
+                    });
+
+                    items.forEach(item => {
+                        grid.appendChild(this.createItemCard(item));
+                    });
+                    try { if (typeof feather !== 'undefined') feather.replace(); } catch(e){}
+                }
+            },
+
+            renderBreadcrumbs() {
+                const bc = document.getElementById('breadcrumb');
+                if (this.isSearchMode) {
+                    bc.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <button onclick="app.clearSearch()" class="text-neutral-500 hover:text-neutral-900 px-2 py-1 rounded-md transition-colors flex items-center gap-1 font-normal">
+                                <i data-feather="arrow-left" class="w-4 h-4"></i> Volver
+                            </button>
+                            <i data-feather="chevron-right" class="w-4 h-4 text-neutral-400"></i>
+                            <span class="text-neutral-900 font-semibold flex items-center gap-1.5">
+                                <i data-feather="search" class="w-3.5 h-3.5 text-blue-500"></i>
+                                Búsqueda: "${this.escapeHtml(this.searchQuery)}"
+                            </span>
+                        </div>
+                    `;
+                    try { if (typeof feather !== 'undefined') feather.replace(); } catch(e){}
+                    return;
+                }
+
+                const parts = this.currentPath.split('/').filter(Boolean);
+                bc.innerHTML = `<button onclick="app.navigateTo('')" class="text-neutral-500 hover:text-neutral-900 px-2 py-1 rounded-md transition-colors">Inicio</button>`;
+                
+                let pathSoFar = '';
+                parts.forEach(part => {
+                    pathSoFar += (pathSoFar ? '/' : '') + part;
+                    bc.innerHTML += `
+                        <div class="flex items-center">
+                            <i data-feather="chevron-right" class="w-4 h-4 text-neutral-400 mx-1"></i>
+                            <button onclick="app.navigateTo('${pathSoFar}')" class="text-neutral-700 hover:text-neutral-900 px-2 py-1 rounded-md transition-colors">${part}</button>
+                        </div>
+                    `;
+                });
+                
+                if (this.currentPath) {
+                    const currentFolderName = parts[parts.length - 1];
+                    bc.innerHTML += `
+                        <div class="flex items-center ml-2 border-l border-neutral-200 pl-2 gap-0.5">
+                            <button onclick="app.copyUrl('/media/${this.currentPath}/')" class="text-neutral-400 hover:text-blue-600 p-1.5 rounded-md transition-colors hover:bg-blue-50" title="Copiar enlace de esta carpeta">
+                                <i data-feather="link" class="w-3.5 h-3.5"></i>
+                            </button>
+                            <button onclick="app.copyToClipboard('${this.currentPath}', '${currentFolderName}', 'copy')" class="text-neutral-400 hover:text-blue-600 p-1.5 rounded-md transition-colors hover:bg-blue-50" title="Copiar esta carpeta">
+                                <i data-feather="copy" class="w-3.5 h-3.5"></i>
+                            </button>
+                            <button onclick="app.copyToClipboard('${this.currentPath}', '${currentFolderName}', 'cut')" class="text-neutral-400 hover:text-blue-600 p-1.5 rounded-md transition-colors hover:bg-blue-50" title="Mover esta carpeta">
+                                <i data-feather="scissors" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    `;
+                }
+                
+                try { if (typeof feather !== 'undefined') feather.replace(); } catch(e){}
+            },
+
+            navigateTo(path) {
+                this.currentPath = path;
+                this.clearSelection();
+                if (this.isSearchMode) {
+                    this.clearSearch();
+                } else {
+                    const input = document.getElementById('searchInput');
+                    if (input) input.value = '';
+                    const clearBtn = document.getElementById('clearSearchBtn');
+                    if (clearBtn) clearBtn.classList.add('hidden');
+                    const banner = document.getElementById('searchBanner');
+                    if (banner) banner.classList.add('hidden');
+                    this.loadFiles();
+                }
+            },
+
+            createItemCard(item) {
+                const isFav = this.favorites.includes(item.path);
+                const isSelected = this.selectedItems.some(i => i.path === item.path);
+                
+                const div = document.createElement('div');
+                div.className = 'group relative flex flex-col items-center p-3 rounded-xl hover:bg-neutral-100 cursor-pointer transition-colors border border-transparent hover:border-neutral-200';
+                if (isSelected) {
+                    div.classList.add('bg-blue-50', 'border-blue-200');
+                    div.classList.remove('hover:bg-neutral-100', 'border-transparent', 'hover:border-neutral-200');
+                }
+                
+                let iconHtml = '';
+                if (item.isDirectory) {
+                    iconHtml = `<i data-feather="folder" class="w-10 h-10 text-blue-500 fill-blue-500/20"></i>`;
+                    div.onclick = (e) => {
+                        if (this.selectedItems.length > 0) {
+                            e.stopPropagation();
+                            this.toggleSelection(item.path, item.name, item.isDirectory);
+                            return;
+                        }
+                        if (this.isSearchMode) {
+                            this.clearSearch();
+                        }
+                        this.navigateTo(item.path);
+                    };
+                } else if (item.url && item.name.match(/\.(webp|jpg|jpeg|png|gif)$/i)) {
+                    iconHtml = `<img src="${item.url}" alt="${item.name}" class="w-full h-full object-cover" loading="lazy" />`;
+                    div.onclick = (e) => {
+                        if (this.selectedItems.length > 0) {
+                            e.stopPropagation();
+                            this.toggleSelection(item.path, item.name, item.isDirectory);
+                            return;
+                        }
+                        this.openLightbox(item.url);
+                    };
+                } else {
+                    let ext = item.name.split('.').pop().toUpperCase();
+                    if (ext === item.name.toUpperCase()) ext = 'FILE';
+                    if (ext.length > 4) ext = ext.substring(0, 4);
+                    
+                    iconHtml = `
+                        <i data-feather="file" class="w-10 h-10 text-neutral-300"></i>
+                        <span class="absolute mt-2.5 bg-white text-[9px] font-extrabold text-neutral-600 px-1 rounded shadow-sm border border-neutral-200">
+                            ${ext}
+                        </span>
+                    `;
+                    div.onclick = (e) => {
+                        if (this.selectedItems.length > 0) {
+                            e.stopPropagation();
+                            this.toggleSelection(item.path, item.name, item.isDirectory);
+                        }
+                    };
+                }
+
+                let locationHtml = '';
+                if (this.isSearchMode && item.directory) {
+                    locationHtml = `
+                        <span class="text-[10px] text-neutral-400 truncate max-w-full hover:text-neutral-600 mt-0.5 cursor-pointer hover:underline relative z-10" title="Carpeta: /${item.directory}" onclick="event.stopPropagation(); app.navigateTo('${item.directory}')">
+                            ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â /${item.directory}
+                        </span>
+                    `;
+                }
+
+                let actionsBtn = `
+                    <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex gap-1">
+                        <button onclick="event.stopPropagation(); app.toggleFavorite('${item.path}')" class="bg-white/90 p-1.5 rounded-md shadow backdrop-blur-sm hover:bg-white ${isFav ? 'text-yellow-500' : 'text-neutral-700'}" title="${isFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}">
+                            <i data-feather="star" class="w-3.5 h-3.5" ${isFav ? 'fill="currentColor"' : ''}></i>
+                        </button>
+                        ${!item.isDirectory && item.name.match(/\.(jpg|jpeg|png)$/i) ? `
+                        <button onclick="event.stopPropagation(); app.convertToWebP('${item.path}')" class="bg-white/90 p-1.5 rounded-md shadow backdrop-blur-sm hover:bg-green-50 text-green-600" title="Convertir a WebP (Reduce tamaño)">
+                            <i data-feather="image" class="w-3.5 h-3.5"></i>
+                        </button>
+                        ` : ''}
+                        ${!item.isDirectory && item.url ? `
+                        <button onclick="event.stopPropagation(); app.downloadFile('${item.url}', '${item.name}')" class="bg-white/90 p-1.5 rounded-md shadow backdrop-blur-sm hover:bg-blue-50 text-blue-600" title="Descargar">
+                            <i data-feather="download" class="w-3.5 h-3.5"></i>
+                        </button>
+                        ` : ''}
+                        ${(!item.isDirectory && item.url) || item.isDirectory ? `
+                        <button onclick="event.stopPropagation(); app.copyUrl('${item.isDirectory ? '/media/' + item.path + '/' : item.url}')" class="bg-white/90 p-1.5 rounded-md shadow backdrop-blur-sm hover:bg-white text-neutral-700" title="Copiar URL directa">
+                            <i data-feather="link" class="w-3.5 h-3.5"></i>
+                        </button>
+                        ` : ''}
+                        <button onclick="event.stopPropagation(); app.copyToClipboard('${item.path}', '${item.name}', 'cut')" class="bg-white/90 p-1.5 rounded-md shadow backdrop-blur-sm hover:bg-white text-neutral-700" title="Cortar">
+                            <i data-feather="scissors" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button onclick="event.stopPropagation(); app.copyToClipboard('${item.path}', '${item.name}', 'copy')" class="bg-white/90 p-1.5 rounded-md shadow backdrop-blur-sm hover:bg-white text-neutral-700" title="Copiar">
+                            <i data-feather="copy" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button onclick="event.stopPropagation(); app.renameItem('${item.path}', '${item.name}', ${item.isDirectory})" class="bg-white/90 p-1.5 rounded-md shadow backdrop-blur-sm hover:bg-white text-neutral-700" title="Renombrar">
+                            <i data-feather="edit-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button onclick="event.stopPropagation(); app.deleteItem('${item.path}', ${item.isDirectory})" class="bg-white/90 p-1.5 rounded-md shadow backdrop-blur-sm hover:bg-red-50 text-red-600" title="Eliminar">
+                            <i data-feather="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                `;
+
+                let favIndicator = isFav ? `
+                    <div class="absolute top-2 left-2 z-10 text-yellow-500 bg-white/90 rounded-full p-1 shadow-sm">
+                        <i data-feather="star" class="w-3.5 h-3.5" fill="currentColor"></i>
+                    </div>
+                ` : '';
+
+                let checkboxHtml = `
+                    <div class="absolute bottom-2 right-2 z-20 ${isSelected || this.selectedItems.length > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity" onclick="event.stopPropagation()">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="app.toggleSelection('${item.path}', '${item.name}', ${item.isDirectory})" class="w-5 h-5 rounded border-neutral-300 text-blue-600 focus:ring-blue-500 cursor-pointer bg-white shadow-sm" title="Seleccionar" />
+                    </div>
+                `;
+
+                div.innerHTML = `
+                    ${checkboxHtml}
+                    ${favIndicator}
+                    <div class="w-20 h-20 mb-2 flex items-center justify-center relative bg-neutral-50 rounded-lg overflow-hidden shadow-sm border border-neutral-100">
+                        ${iconHtml}
+                    </div>
+                    <p class="text-xs font-medium text-center w-full truncate px-1 text-neutral-700 group-hover:text-neutral-900" title="${item.name}">
+                        ${item.name}
+                    </p>
+                    ${locationHtml}
+                    ${actionsBtn}
+                `;
+                return div;
+            },
+
+            downloadFile(url, name) {
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = name || 'descarga';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            },
+
+            copyUrl(url) {
+                // Como este archivo está en la raíz, item.url (ej: /media/foto.webp) 
+                // ya tiene la barra inicial, así que solo agregamos origin o quitamos la barra inicial si hace falta
+                let finalUrl = url;
+                if(url.startsWith('/')) {
+                   finalUrl = url.substring(1);
+                }
+                const fullUrl = window.location.origin + '/' + finalUrl;
+                navigator.clipboard.writeText(fullUrl);
+                alert("URL copiada: " + fullUrl);
+            },
+
+            async renameItem(path, oldName, isDir) {
+                let baseName = oldName;
+                let ext = '';
+                
+                if (!isDir) {
+                    const dotIndex = oldName.lastIndexOf('.');
+                    if (dotIndex > 0) {
+                        baseName = oldName.substring(0, dotIndex);
+                        ext = oldName.substring(dotIndex);
+                    }
+                }
+
+                let promptText = 'Ingresa el nuevo nombre para: ' + oldName;
+                if (!isDir && ext) {
+                    promptText = 'Ingresa el nuevo nombre (sin la extensión ' + ext + '):';
+                }
+
+                const inputName = prompt(promptText, baseName);
+                if (!inputName || inputName.trim() === '' || inputName === baseName) return;
+                
+                const newName = inputName.trim() + ext;
+                
+                try {
+                    const res = await fetch('api/explorer.php?path=' + encodeURIComponent(path), {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ newName: newName })
+                    });
+                    if (res.ok) {
+                        this.refreshView();
+                    } else {
+                        const data = await res.json();
+                        alert('Error: ' + (data.error || 'No se pudo renombrar'));
+                    }
+                } catch (e) {
+                    alert('Error de conexión');
+                }
+            },
+
+            async deleteItem(path, isDir) {
+                const msg = isDir ? '¿Estás seguro de que deseas eliminar esta carpeta y TODO su contenido?' : '¿Estás seguro de que deseas eliminar este archivo?';
+                if (!confirm(msg)) return;
+                
+                try {
+                    const res = await fetch('api/explorer.php?path=' + encodeURIComponent(path), {
+                        method: 'DELETE'
+                    });
+                    if (res.ok) {
+                        this.refreshView();
+                    } else {
+                        const data = await res.json();
+                        alert('Error: ' + (data.error || 'No se pudo eliminar'));
+                    }
+                } catch (e) {
+                    alert('Error de conexión');
+                }
+            },
+
+            async convertToWebP(path) {
+                if (!confirm('¿Deseas convertir esta imagen a WebP? Se borrará el archivo original para ahorrar espacio.')) return;
+                
+                try {
+                    const res = await fetch('api/explorer.php', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            action: 'convert_webp',
+                            sourcePath: path
+                        })
+                    });
+                    if (res.ok) {
+                        this.refreshView();
+                    } else {
+                        const data = await res.json();
+                        alert('Error: ' + (data.error || 'No se pudo convertir'));
+                    }
+                } catch (e) {
+                    alert('Error de conexión');
+                }
+            },
+
+            copyToClipboard(path, name, action) {
+                this.clipboard = { items: [{path, name}], action };
+                this.updatePasteButton();
+            },
+
+            copyToClipboardBulk(action) {
+                if (this.selectedItems.length === 0) return;
+                this.clipboard = { items: [...this.selectedItems], action };
+                this.updatePasteButton();
+                this.clearSelection();
+                alert(`${this.clipboard.items.length} elemento(s) copiado(s) al portapapeles.`);
+            },
+
+            clearClipboard() {
+                this.clipboard = { items: [], action: null };
+                this.updatePasteButton();
+            },
+            
+            updatePasteButton() {
+                const bar = document.getElementById('clipboardBar');
+                const text = document.getElementById('pasteText');
+                if (this.clipboard && this.clipboard.items && this.clipboard.items.length > 0) {
+                    bar.classList.remove('hidden');
+                    bar.classList.add('flex');
+                    const prefix = this.clipboard.action === 'cut' ? 'Mover' : 'Pegar';
+                    const name = this.clipboard.items.length === 1 ? this.clipboard.items[0].name : `${this.clipboard.items.length} elementos`;
+                    text.textContent = `${prefix} ${name}`;
+                    text.title = `${prefix} ${name}`;
+                } else {
+                    bar.classList.add('hidden');
+                    bar.classList.remove('flex');
+                }
+                try { if (typeof feather !== 'undefined') feather.replace(); } catch(e){}
+            },
+
+            async pasteFromClipboard() {
+                if (!this.clipboard.items || this.clipboard.items.length === 0) return;
+                
+                const actionTitle = this.clipboard.action === 'cut' ? 'Moviendo' : 'Copiando';
+                const itemsToProcess = [...this.clipboard.items];
+                const action = this.clipboard.action;
+                const targetDir = this.currentPath;
+                
+                if (action === 'cut') {
+                    this.clearClipboard();
+                }
+
+                await this.processBulkAction(itemsToProcess, actionTitle, async (item) => {
+                    const res = await fetch('api/explorer.php', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            action: action,
+                            sourcePath: item.path,
+                            targetDir: targetDir
+                        })
+                    });
+                    if (!res.ok) {
+                        const data = await res.json();
+                        throw new Error(data.error || 'Error al procesar');
+                    }
+                });
+            },
+
+            toggleSelection(path, name, isDirectory) {
+                const index = this.selectedItems.findIndex(i => i.path === path);
+                if (index > -1) {
+                    this.selectedItems.splice(index, 1);
+                } else {
+                    this.selectedItems.push({ path, name, isDirectory });
+                }
+                this.updateBulkActionBar();
+                this.renderItems(this.currentItems);
+            },
+
+            clearSelection() {
+                this.selectedItems = [];
+                this.updateBulkActionBar();
+                this.renderItems(this.currentItems);
+            },
+
+            updateBulkActionBar() {
+                const bar = document.getElementById('bulkActionBar');
+                const count = document.getElementById('bulkCount');
+                if (this.selectedItems.length > 0) {
+                    count.textContent = this.selectedItems.length;
+                    bar.classList.remove('translate-y-24', 'opacity-0', 'pointer-events-none');
+                    bar.classList.add('translate-y-0', 'opacity-100');
+                } else {
+                    bar.classList.remove('translate-y-0', 'opacity-100');
+                    bar.classList.add('translate-y-24', 'opacity-0', 'pointer-events-none');
+                }
+            },
+
+            async deleteBulk() {
+                if (this.selectedItems.length === 0) return;
+                if (!confirm(`¿Estás seguro de que deseas eliminar ${this.selectedItems.length} elemento(s)? Esta acciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n no se puede deshacer.`)) return;
+                
+                const itemsToDelete = [...this.selectedItems];
+                this.clearSelection();
+                
+                await this.processBulkAction(itemsToDelete, 'Eliminando', async (item) => {
+                    const res = await fetch('api/explorer.php?path=' + encodeURIComponent(item.path), {
+                        method: 'DELETE'
+                    });
+                    if (!res.ok) {
+                        const data = await res.json();
+                        throw new Error(data.error || 'Error al eliminar');
+                    }
+                });
+            },
+
+            toggleNewFolder(show) {
+                document.getElementById('newFolderForm').style.display = show ? 'flex' : 'none';
+                document.getElementById('btnNewFolder').style.display = show ? 'none' : 'flex';
+                if (show) document.getElementById('newFolderName').focus();
+            },
+
+            async createFolder(e) {
+                e.preventDefault();
+                const name = document.getElementById('newFolderName').value.trim();
+                if (!name) return;
+                
+                try {
+                    const res = await fetch('api/explorer.php?path=' + encodeURIComponent(this.currentPath), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ folderName: name })
+                    });
+                    
+                    if (res.ok) {
+                        document.getElementById('newFolderName').value = '';
+                        this.toggleNewFolder(false);
+                        this.loadFiles();
+                    } else {
+                        let errMsg = 'No se pudo crear la carpeta';
+                        try {
+                            const data = await res.json();
+                            if (data.error) errMsg = data.error;
+                        } catch(err){}
+                        alert('Error: ' + errMsg);
+                    }
+                } catch (err) {
+                    alert('Error de conexión');
+                }
+            },
+
+            onDragOver(e) {
+                e.preventDefault();
+                document.getElementById('dragOverlay').classList.remove('hidden');
+                document.getElementById('dragOverlay').classList.add('flex');
+            },
+            
+            onDragLeave(e) {
+                e.preventDefault();
+                if (e.relatedTarget === null || !document.getElementById('fileGrid').contains(e.relatedTarget)) {
+                    document.getElementById('dragOverlay').classList.add('hidden');
+                    document.getElementById('dragOverlay').classList.remove('flex');
+                }
+            },
+
+            onDrop(e) {
+                e.preventDefault();
+                document.getElementById('dragOverlay').classList.add('hidden');
+                document.getElementById('dragOverlay').classList.remove('flex');
+                
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    this.handleUpload(e.dataTransfer.files);
+                }
+            },
+
+            toggleUploadPanelBody() {
+                document.getElementById('uploadPanelBody').classList.toggle('hidden');
+            },
+
+            closeUploadPanel() {
+                document.getElementById('uploadPanel').classList.add('hidden');
+            },
+
+            async processBulkAction(items, actionTitle, actionFn) {
+                document.getElementById('uploadProgress').classList.remove('hidden');
+                
+                const panel = document.getElementById('uploadPanel');
+                const list = document.getElementById('uploadPanelList');
+                const title = document.getElementById('uploadPanelTitle');
+                const status = document.getElementById('uploadPanelStatus');
+                const percent = document.getElementById('uploadPanelPercent');
+                const progressBar = document.getElementById('uploadPanelProgressBar');
+                
+                panel.classList.remove('hidden');
+                document.getElementById('uploadPanelBody').classList.remove('hidden');
+                
+                const total = items.length;
+                let completed = 0;
+                
+                title.textContent = `${actionTitle} ${total} elemento${total > 1 ? 's' : ''}...`;
+                status.textContent = `0 de ${total} completados`;
+                percent.textContent = `0%`;
+                progressBar.style.width = `0%`;
+                list.innerHTML = '';
+                
+                const elements = {};
+                for(let i = 0; i < total; i++) {
+                    const item = items[i];
+                    const id = 'bulk_action_' + Date.now() + '_' + i;
+                    
+                    const el = document.createElement('div');
+                    el.className = 'flex items-center justify-between p-2 rounded-lg hover:bg-neutral-50 text-sm transition-colors border border-transparent';
+                    el.innerHTML = `
+                        <div class="flex items-center gap-3 overflow-hidden flex-1">
+                            <i data-feather="${item.isDirectory ? 'folder' : 'file'}" class="w-4 h-4 text-neutral-400 shrink-0"></i>
+                            <span class="truncate text-neutral-700 font-medium" title="${item.name}">${item.name}</span>
+                        </div>
+                        <div class="shrink-0 ml-3" id="${id}_status">
+                            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-neutral-900"></div>
+                        </div>
+                    `;
+                    list.appendChild(el);
+                    elements[i] = { id, item, el };
+                }
+                
+                try { if (typeof feather !== 'undefined') feather.replace(); } catch(e){}
+                
+                for(let i=0; i<total; i++) {
+                    const ref = elements[i];
+                    const statusEl = document.getElementById(ref.id + '_status');
+                    ref.el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                    try {
+                        await actionFn(ref.item);
+                        statusEl.innerHTML = `<i data-feather="check-circle" class="w-4 h-4 text-green-500"></i>`;
+                    } catch(e) {
+                        statusEl.innerHTML = `<i data-feather="alert-circle" class="w-4 h-4 text-red-500"></i>`;
+                        statusEl.title = e.message || 'Error';
+                        ref.el.classList.add('bg-red-50');
+                    }
+                    
+                    completed++;
+                    const p = Math.round((completed / total) * 100);
+                    status.textContent = `${completed} de ${total} completados`;
+                    percent.textContent = `${p}%`;
+                    progressBar.style.width = `${p}%`;
+                    
+                    try { if (typeof feather !== 'undefined') feather.replace(); } catch(e){}
+                }
+                
+                title.textContent = `OperaciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n completada`;
+                document.getElementById('uploadProgress').classList.add('hidden');
+                this.refreshView();
+            },
+
+            async handleUpload(files) {
+                if (!files || files.length === 0) return;
+                
+                // Show traditional progress bar as well
+                document.getElementById('uploadProgress').classList.remove('hidden');
+                
+                // Setup and show panel
+                const panel = document.getElementById('uploadPanel');
+                const list = document.getElementById('uploadPanelList');
+                const title = document.getElementById('uploadPanelTitle');
+                const status = document.getElementById('uploadPanelStatus');
+                const percent = document.getElementById('uploadPanelPercent');
+                const progressBar = document.getElementById('uploadPanelProgressBar');
+                
+                panel.classList.remove('hidden');
+                document.getElementById('uploadPanelBody').classList.remove('hidden');
+                
+                const total = files.length;
+                let completed = 0;
+                
+                title.textContent = `Subiendo ${total} archivo${total > 1 ? 's' : ''}...`;
+                status.textContent = `0 de ${total} completados`;
+                percent.textContent = `0%`;
+                progressBar.style.width = `0%`;
+                list.innerHTML = '';
+                
+                const fileElements = {};
+
+                // Pre-create UI elements for all files
+                for(let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const id = 'upload_file_' + Date.now() + '_' + i;
+                    
+                    const el = document.createElement('div');
+                    el.className = 'flex items-center justify-between p-2 rounded-lg hover:bg-neutral-50 text-sm transition-colors border border-transparent';
+                    el.innerHTML = `
+                        <div class="flex items-center gap-3 overflow-hidden flex-1">
+                            <i data-feather="file" class="w-4 h-4 text-neutral-400 shrink-0"></i>
+                            <span class="truncate text-neutral-700 font-medium" title="${file.name}">${file.name}</span>
+                        </div>
+                        <div class="shrink-0 ml-3" id="${id}_status">
+                            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-neutral-900"></div>
+                        </div>
+                    `;
+                    list.appendChild(el);
+                    fileElements[i] = { id, file, el };
+                }
+                
+                try { if (typeof feather !== 'undefined') feather.replace(); } catch(e){}
+                
+                // Process uploads sequentially
+                for(let i=0; i<files.length; i++) {
+                    const ref = fileElements[i];
+                    const file = ref.file;
+                    const statusEl = document.getElementById(ref.id + '_status');
+                    
+                    // Scroll to current item so user sees progress
+                    ref.el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                    try {
+                        const singleForm = new FormData();
+                        
+                        let targetPath = this.currentPath;
+                        if (file.webkitRelativePath) {
+                            const parts = file.webkitRelativePath.split('/');
+                            parts.pop(); // remove file name
+                            if (parts.length > 0) {
+                                targetPath = targetPath ? targetPath + '/' + parts.join('/') : parts.join('/');
+                            }
+                        }
+                        
+                        singleForm.append('path', targetPath);
+                        singleForm.append('file', file);
+                        
+                        const res = await fetch('api/upload.php', {
+                            method: 'POST',
+                            body: singleForm
+                        });
+                        
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.success) {
+                                statusEl.innerHTML = `<i data-feather="check-circle" class="w-4 h-4 text-green-500"></i>`;
+                            } else {
+                                statusEl.innerHTML = `<i data-feather="alert-circle" class="w-4 h-4 text-red-500"></i>`;
+                                statusEl.title = data.error || 'Error';
+                                ref.el.classList.add('bg-red-50');
+                            }
+                        } else {
+                            let errorMsg = 'Error de servidor';
+                            try {
+                                const data = await res.json();
+                                if (data.error) errorMsg = data.error;
+                            } catch(e) {}
+                            statusEl.innerHTML = `<i data-feather="alert-circle" class="w-4 h-4 text-red-500"></i>`;
+                            statusEl.title = errorMsg;
+                            ref.el.classList.add('bg-red-50');
+                        }
+                    } catch(e) {
+                        console.error("Error subiendo", file.name);
+                        statusEl.innerHTML = `<i data-feather="alert-circle" class="w-4 h-4 text-red-500"></i>`;
+                        statusEl.title = "Error de red: " + e.message;
+                        ref.el.classList.add('bg-red-50');
+                    }
+                    
+                    completed++;
+                    const p = Math.round((completed / total) * 100);
+                    status.textContent = `${completed} de ${total} completados`;
+                    percent.textContent = `${p}%`;
+                    progressBar.style.width = `${p}%`;
+                    
+                    try { if (typeof feather !== 'undefined') feather.replace(); } catch(e){}
+                }
+                
+                title.textContent = `Subida completada`;
+                document.getElementById('uploadProgress').classList.add('hidden');
+                this.refreshView();
+            },
+
+            openLightbox(url) {
+                this.currentImageIndex = this.imagesList.findIndex(i => i.url === url);
+                if (this.currentImageIndex === -1) return;
+                
+                this.updateLightboxImage(this.imagesList[this.currentImageIndex]);
+                document.getElementById('lightbox').classList.remove('hidden');
+                
+                // Keyboard support
+                this._keydownHandler = (e) => {
+                    if (e.key === 'Escape') this.closeLightbox();
+                    if (e.key === 'ArrowLeft') this.prevImage();
+                    if (e.key === 'ArrowRight') this.nextImage();
+                };
+                window.addEventListener('keydown', this._keydownHandler);
+            },
+
+            updateLightboxImage(item) {
+                if (!item) return;
+                document.getElementById('lightboxImg').src = item.url;
+                let finalUrl = item.url;
+                if(item.url.startsWith('/')) {
+                   finalUrl = item.url.substring(1);
+                }
+                const fullUrl = window.location.origin + '/' + finalUrl;
+                document.getElementById('lightboxUrl').textContent = fullUrl;
+                
+                document.getElementById('lbPrev').style.display = this.currentImageIndex > 0 ? 'flex' : 'none';
+                document.getElementById('lbNext').style.display = this.currentImageIndex >= 0 && this.currentImageIndex < this.imagesList.length - 1 ? 'flex' : 'none';
+                
+                this.renderLightboxActions(item);
+            },
+
+            renderLightboxActions(item) {
+                const container = document.getElementById('lightboxActions');
+                if (!container) return;
+                
+                const isFav = this.favorites.includes(item.path);
+                
+                let html = `
+                    <button onclick="app.toggleFavorite('${item.path}'); app.renderLightboxActions(app.imagesList[app.currentImageIndex])" class="text-white hover:text-yellow-500 bg-white/10 p-2 rounded-full backdrop-blur-md transition-colors" title="${isFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}">
+                        <i data-feather="star" class="w-5 h-5" ${isFav ? 'fill="#eab308" class="text-yellow-500 w-5 h-5"' : ''}></i>
+                    </button>
+                `;
+                
+                if (item.name.match(/\.(jpg|jpeg|png)$/i)) {
+                    html += `
+                        <button onclick="app.convertToWebP('${item.path}')" class="text-white hover:text-green-400 bg-white/10 p-2 rounded-full backdrop-blur-md transition-colors" title="Convertir a WebP">
+                            <i data-feather="image" class="w-5 h-5"></i>
+                        </button>
+                    `;
+                }
+
+                html += `
+                    <button onclick="app.downloadFile('${item.url}', '${item.name}')" class="text-white hover:text-blue-400 bg-white/10 p-2 rounded-full backdrop-blur-md transition-colors" title="Descargar">
+                        <i data-feather="download" class="w-5 h-5"></i>
+                    </button>
+                    <button onclick="app.copyUrl('${item.url}')" class="text-white hover:text-neutral-300 bg-white/10 p-2 rounded-full backdrop-blur-md transition-colors" title="Copiar URL directa">
+                        <i data-feather="link" class="w-5 h-5"></i>
+                    </button>
+                    <button onclick="app.copyToClipboard('${item.path}', '${item.name}', 'cut'); alert('Cortado')" class="text-white hover:text-neutral-300 bg-white/10 p-2 rounded-full backdrop-blur-md transition-colors" title="Cortar">
+                        <i data-feather="scissors" class="w-5 h-5"></i>
+                    </button>
+                    <button onclick="app.copyToClipboard('${item.path}', '${item.name}', 'copy'); alert('Copiado')" class="text-white hover:text-neutral-300 bg-white/10 p-2 rounded-full backdrop-blur-md transition-colors" title="Copiar">
+                        <i data-feather="copy" class="w-5 h-5"></i>
+                    </button>
+                    <button onclick="app.renameItem('${item.path}', '${item.name}', false); app.closeLightbox()" class="text-white hover:text-neutral-300 bg-white/10 p-2 rounded-full backdrop-blur-md transition-colors" title="Renombrar">
+                        <i data-feather="edit-2" class="w-5 h-5"></i>
+                    </button>
+                    <button onclick="app.deleteItem('${item.path}', false); app.closeLightbox()" class="text-white hover:text-red-400 bg-white/10 p-2 rounded-full backdrop-blur-md transition-colors" title="Eliminar">
+                        <i data-feather="trash-2" class="w-5 h-5"></i>
+                    </button>
+                    <div class="w-px h-9 bg-white/20 mx-1 hidden sm:block"></div>
+                    <button onclick="app.closeLightbox()" class="text-white hover:text-neutral-300 bg-white/10 p-2 rounded-full backdrop-blur-md transition-colors" title="Cerrar">
+                        <i data-feather="x" class="w-5 h-5"></i>
+                    </button>
+                `;
+                
+                container.innerHTML = html;
+                try { if (typeof feather !== 'undefined') feather.replace(); } catch(e){}
+            },
+
+            prevImage(e) {
+                if (e) e.stopPropagation();
+                if (this.currentImageIndex > 0) {
+                    this.currentImageIndex--;
+                    this.updateLightboxImage(this.imagesList[this.currentImageIndex]);
+                }
+            },
+            
+            nextImage(e) {
+                if (e) e.stopPropagation();
+                if (this.currentImageIndex >= 0 && this.currentImageIndex < this.imagesList.length - 1) {
+                    this.currentImageIndex++;
+                    this.updateLightboxImage(this.imagesList[this.currentImageIndex]);
+                }
+            },
+
+            closeLightbox() {
+                document.getElementById('lightbox').classList.add('hidden');
+                document.getElementById('lightboxImg').src = '';
+                if (this._keydownHandler) {
+                    window.removeEventListener('keydown', this._keydownHandler);
+                }
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>

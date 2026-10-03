@@ -1,0 +1,11 @@
+﻿# Ignorar la configuración privada y base de datos
+api/config.json
+
+# Ignorar la carpeta de subidas por defecto si está dentro del proyecto
+uploads/
+media/
+files/
+
+# Archivos del SO
+.DS_Store
+Thumbs.db
