@@ -171,14 +171,14 @@ if ($method === 'GET') {
     $data = json_decode(file_get_contents('php://input'), true);
     $folderName = $data['folderName'] ?? '';
     
+    // Limpiar nombre con la función unificada de core.php
+    $folderName = sanitizeName($folderName);
+    
     if (empty($folderName)) {
         http_response_code(400);
         echo json_encode(['error' => 'Folder name is required']);
         exit;
     }
-    
-    // Limpiar nombre
-    $folderName = preg_replace('/[^a-zA-Z0-9_\-]/', '', $folderName);
     
     $intendedPath = $pathParam === '' ? $folderName : $pathParam . '/' . $folderName;
     $newFolderPath = resolveSecurePath($intendedPath);
@@ -239,9 +239,15 @@ if ($method === 'GET') {
         exit;
     }
     
-    // Validar nombre (letras, numeros, puntos, guiones, espacios no al inicio/fin)
-    $newName = preg_replace('/[^a-zA-Z0-9_\-\.\s]/', '', $newName);
-    $newName = trim($newName);
+    // Sanitizar nuevo nombre conservando la extensión si es archivo
+    if (is_dir($targetPath)) {
+        $newName = sanitizeName($newName);
+    } else {
+        $origExt = strtolower(pathinfo($targetPath, PATHINFO_EXTENSION));
+        $nameWithoutExt = pathinfo($newName, PATHINFO_FILENAME);
+        $newBase = sanitizeName($nameWithoutExt);
+        $newName = $origExt !== '' ? $newBase . '.' . $origExt : $newBase;
+    }
     
     if (empty($newName)) {
         http_response_code(400);

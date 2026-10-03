@@ -60,3 +60,20 @@ function resolveSecureParentPath($path) {
     if ($parentReal !== $mediaReal && strpos($parentReal, $mediaReal . DIRECTORY_SEPARATOR) !== 0) return false;
     return MEDIA_DIR . '/' . ltrim($path, '/');
 }
+
+function sanitizeName($name) {
+    $name = mb_strtolower($name, 'UTF-8');
+    $name = strtr($name, [
+        'á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ü'=>'u','ñ'=>'n','Á'=>'a','É'=>'e','Í'=>'i','Ó'=>'o','Ú'=>'u','Ü'=>'u','Ñ'=>'n'
+    ]);
+    $name = str_replace([' ', '_'], '-', $name);
+    $name = preg_replace('/[^a-z0-9\-\.]/', '', $name);
+    $name = preg_replace('/-+/', '-', $name);
+    $name = trim($name, '-');
+    $name = ltrim($name, '.');
+    $name = trim($name, '-');
+    if ($name === '.' || $name === '..') {
+        return '';
+    }
+    return $name;
+}

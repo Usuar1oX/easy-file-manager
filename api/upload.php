@@ -28,46 +28,113 @@ if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
     exit;
 }
 
-function sanitizeName($name) {
-    $name = mb_strtolower($name, 'UTF-8');
-    $name = strtr($name, [
-        'á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ü'=>'u','ñ'=>'n','Á'=>'a','É'=>'e','Í'=>'i','Ó'=>'o','Ú'=>'u','Ü'=>'u','Ñ'=>'n'
-    ]);
-    $name = str_replace([' ', '_'], '-', $name);
-    $name = preg_replace('/[^a-z0-9\-\.]/', '', $name);
-    $name = preg_replace('/-+/', '-', $name);
-    return trim($name, '-');
-}
-
-function sanitizePath($path) {
-    if (empty($path)) return '';
-    $parts = explode('/', $path);
-    foreach ($parts as &$part) {
-        $part = sanitizeName($part);
-    }
-    return implode('/', array_filter($parts));
-}
-
 $file = $_FILES['file'];
-$pathParam = isset($_POST['path']) ? trim($_POST['path'], '/') : '';
-$pathParam = sanitizePath($pathParam);
-if ($pathParam === '') {
-    $targetPath = resolveSecurePath('');
-} else {
-    $targetPath = resolveSecurePath($pathParam);
-    if ($targetPath === false) {
-        $targetPath = resolveSecureParentPath($pathParam);
-    }
-}
+$rawPath = isset($_POST['path']) ? (string)$_POST['path'] : '';
 
-if ($targetPath === false) {
+// 3) Rechaza segmentos "." o ".." y caracteres nulos.
+if (strpos($rawPath, "\0") !== false) {
     http_response_code(400);
-    echo json_encode(['error' => 'Invalid upload path']);
+    echo json_encode(['error' => 'Invalid path']);
     exit;
 }
 
-if (!is_dir($targetPath)) {
-    mkdir($targetPath, 0755, true);
+// Normalizar \ a / y quitar / al inicio y final
+$normalizedPath = str_replace('\\', '/', $rawPath);
+$normalizedPath = trim($normalizedPath, '/');
+
+// Separar segmentos y validar traversal
+$rawSegments = $normalizedPath === '' ? [] : explode('/', $normalizedPath);
+$segments = [];
+foreach ($rawSegments as $seg) {
+    $segTrim = trim($seg);
+    if ($segTrim === '.' || $segTrim === '..') {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid path']);
+        exit;
+    }
+    if ($segTrim !== '') {
+        $segments[] = $segTrim;
+    }
+}
+$pathParam = implode('/', $segments);
+
+// 1) La ruta destino NO debe pasar por sanitizeName.
+// Usa la ruta tal como llega y valídala con resolveSecurePath().
+// Si la carpeta existe, sube ahí respetando mayúsculas.
+if ($pathParam === '') {
+    $targetPath = resolveSecurePath('');
+    if ($targetPath === false || !is_dir($targetPath)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid upload path']);
+        exit;
+    }
+    $relativeDirPath = '';
+} else {
+    $existingPath = resolveSecurePath($pathParam);
+    if ($existingPath !== false && is_dir($existingPath)) {
+        $targetPath = $existingPath;
+        $relativeDirPath = $pathParam;
+    } else {
+        // 2) Solo cuando la carpeta NO existe (caso "Subir Carpeta"):
+        // Separa la ruta en la parte que ya existe y los segmentos nuevos.
+        $existingSegments = [];
+        $newSegments = [];
+        $currentCheck = '';
+        $foundMissing = false;
+
+        foreach ($segments as $seg) {
+            if (!$foundMissing) {
+                $nextCheck = ($currentCheck === '') ? $seg : $currentCheck . '/' . $seg;
+                $resolved = resolveSecurePath($nextCheck);
+                if ($resolved !== false && is_dir($resolved)) {
+                    $existingSegments[] = $seg;
+                    $currentCheck = $nextCheck;
+                } else {
+                    $foundMissing = true;
+                    $newSegments[] = $seg;
+                }
+            } else {
+                $newSegments[] = $seg;
+            }
+        }
+
+        // Aplica sanitizeName SOLO a los segmentos nuevos, valida con resolveSecureParentPath y créalos con mkdir 0755 recursivo.
+        $currentPathBuilder = implode('/', $existingSegments);
+        foreach ($newSegments as $seg) {
+            $sanitized = sanitizeName($seg);
+            if ($sanitized === '') {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid folder name']);
+                exit;
+            }
+            $stepPath = ($currentPathBuilder === '') ? $sanitized : $currentPathBuilder . '/' . $sanitized;
+            
+            $parentResolved = resolveSecureParentPath($stepPath);
+            if ($parentResolved === false) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid upload path']);
+                exit;
+            }
+
+            if (!is_dir($parentResolved)) {
+                if (!mkdir($parentResolved, 0755, true)) {
+                    http_response_code(500);
+                    echo json_encode(['error' => 'Failed to create directory']);
+                    exit;
+                }
+            }
+
+            $currentPathBuilder = $stepPath;
+        }
+
+        $targetPath = resolveSecurePath($currentPathBuilder);
+        if ($targetPath === false || !is_dir($targetPath)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid upload path']);
+            exit;
+        }
+        $relativeDirPath = $currentPathBuilder;
+    }
 }
 
 // Validar tamaño
@@ -155,7 +222,7 @@ if ($isImage) {
 }
 
 if ($success) {
-    $relativePath = $pathParam === '' ? $finalName : $pathParam . '/' . $finalName;
+    $relativePath = $relativeDirPath === '' ? $finalName : $relativeDirPath . '/' . $finalName;
     echo json_encode([
         'success' => true,
         'message' => 'File uploaded successfully',
