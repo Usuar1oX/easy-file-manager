@@ -29,6 +29,38 @@ define('MAX_WIDTH', $config['max_width'] ?? 1920);
 // Usuarios autorizados
 $users = $config['users'] ?? ['admin' => 'admin'];
 
+// Archivos o carpetas ocultos
+$hiddenFiles = $config['hidden_files'] ?? [];
+if (!is_array($hiddenFiles)) {
+    $hiddenFiles = [];
+}
+
+function isHiddenItem($name) {
+    global $hiddenFiles;
+    if ($name === '' || $name === '.' || $name === '..') {
+        return false;
+    }
+    if (strpos($name, '.') === 0) {
+        return true;
+    }
+    if (in_array($name, $hiddenFiles, true)) {
+        return true;
+    }
+    return false;
+}
+
+function isHiddenPath($path) {
+    if (empty($path)) return false;
+    $path = str_replace('\\', '/', $path);
+    $segments = explode('/', trim($path, '/'));
+    foreach ($segments as $segment) {
+        if (isHiddenItem($segment)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function isAuthenticated() {
     return isset($_SESSION['user']);
 }

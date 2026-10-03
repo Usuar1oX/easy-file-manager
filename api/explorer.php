@@ -56,6 +56,12 @@ function normalizeSearchText($text) {
 }
 
 if ($method === 'GET') {
+    if (isHiddenPath($pathParam)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Acceso denegado a archivos ocultos']);
+        exit;
+    }
+
     $searchQuery = isset($_GET['search']) ? trim($_GET['search']) : '';
     
     if ($searchQuery !== '') {
@@ -76,14 +82,16 @@ if ($method === 'GET') {
             );
 
             foreach ($iterator as $fileInfo) {
+                $subPath = $iterator->getSubPathname();
+                $subPath = str_replace('\\', '/', $subPath);
+                if (isHiddenPath($subPath)) continue;
+
                 $filename = $fileInfo->getFilename();
-                if ($filename === '.htaccess') continue;
+                if (isHiddenItem($filename)) continue;
 
                 $normName = normalizeSearchText($filename);
 
                 if (strpos($normName, $normSearch) !== false) {
-                    $subPath = $iterator->getSubPathname();
-                    $subPath = str_replace('\\', '/', $subPath);
                     $parentDir = dirname($subPath);
                     if ($parentDir === '.') $parentDir = '';
 
@@ -136,7 +144,7 @@ if ($method === 'GET') {
 
     foreach ($items as $item) {
         if ($item === '.' || $item === '..') continue;
-        if ($item === '.htaccess') continue;
+        if (isHiddenItem($item)) continue;
         
         $itemPath = $targetPath . '/' . $item;
         $relativePath = $pathParam === '' ? $item : $pathParam . '/' . $item;
@@ -215,6 +223,11 @@ if ($method === 'GET') {
         echo json_encode(['error' => 'Cannot delete root media directory']);
         exit;
     }
+    if (isHiddenPath($pathParam)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Acceso denegado a archivos ocultos']);
+        exit;
+    }
     
     $success = false;
     if (is_dir($targetPath)) {
@@ -236,6 +249,11 @@ if ($method === 'GET') {
     if (empty($newName) || empty($pathParam) || $targetPath === false || !file_exists($targetPath)) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid data']);
+        exit;
+    }
+    if (isHiddenPath($pathParam)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Acceso denegado a archivos ocultos']);
         exit;
     }
     
@@ -291,6 +309,12 @@ if ($method === 'GET') {
     if (empty($action) || empty($sourcePath)) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid data']);
+        exit;
+    }
+
+    if (isHiddenPath($sourcePath) || isHiddenPath($targetDir)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Acceso denegado a archivos ocultos']);
         exit;
     }
 
