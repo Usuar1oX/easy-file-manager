@@ -181,7 +181,10 @@ if ($method === 'GET') {
     $folderName = preg_replace('/[^a-zA-Z0-9_\-]/', '', $folderName);
     
     $intendedPath = $pathParam === '' ? $folderName : $pathParam . '/' . $folderName;
-    $newFolderPath = resolveSecureParentPath($intendedPath);
+    $newFolderPath = resolveSecurePath($intendedPath);
+    if ($newFolderPath === false) {
+        $newFolderPath = resolveSecureParentPath($intendedPath);
+    }
     
     if ($newFolderPath === false) {
         http_response_code(400);
@@ -250,7 +253,10 @@ if ($method === 'GET') {
     if ($basePath === '.' || $basePath === '\\') $basePath = '';
     
     $intendedNewPath = $basePath === '' ? $newName : $basePath . '/' . $newName;
-    $newPath = resolveSecureParentPath($intendedNewPath);
+    $newPath = resolveSecurePath($intendedNewPath);
+    if ($newPath === false) {
+        $newPath = resolveSecureParentPath($intendedNewPath);
+    }
     
     if ($newPath === false) {
         http_response_code(400);

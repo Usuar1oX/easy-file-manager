@@ -12,7 +12,7 @@ Un gestor de archivos e imágenes minimalista, rápido y moderno en un solo arch
 
 ## Estructura
 - `index.html`: Toda la interfaz de usuario en una Single Page Application.
-- \api/\: Los endpoints de backend en PHP.
+- `api/`: Los endpoints de backend en PHP.
 
 ## Características
 - Compresión automática a WebP.

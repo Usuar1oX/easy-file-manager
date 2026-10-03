@@ -1,4 +1,4 @@
-﻿# Ignorar la configuración privada y base de datos
+# Ignorar la configuración privada y base de datos
 api/config.php
 
 # Ignorar la carpeta de subidas por defecto si está dentro del proyecto
@@ -9,3 +9,7 @@ files/
 # Archivos del SO
 .DS_Store
 Thumbs.db
+
+*.py
+test_*.ps1
+debug_*

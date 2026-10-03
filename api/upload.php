@@ -51,7 +51,14 @@ function sanitizePath($path) {
 $file = $_FILES['file'];
 $pathParam = isset($_POST['path']) ? trim($_POST['path'], '/') : '';
 $pathParam = sanitizePath($pathParam);
-$targetPath = resolveSecureParentPath($pathParam);
+if ($pathParam === '') {
+    $targetPath = resolveSecurePath('');
+} else {
+    $targetPath = resolveSecurePath($pathParam);
+    if ($targetPath === false) {
+        $targetPath = resolveSecureParentPath($pathParam);
+    }
+}
 
 if ($targetPath === false) {
     http_response_code(400);

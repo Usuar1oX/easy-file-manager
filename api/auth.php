@@ -11,8 +11,8 @@ if ($method === 'POST') {
     $attemptsFile = sys_get_temp_dir() . '/login_attempts.json';
     
     $attemptsData = [];
-    $fp = fopen($attemptsFile, 'c+');
-    if (flock($fp, LOCK_EX)) {
+    $fp = @fopen($attemptsFile, 'c+');
+    if ($fp !== false && flock($fp, LOCK_EX)) {
         $filesize = filesize($attemptsFile);
         if ($filesize > 0) {
             $json = fread($fp, $filesize);
