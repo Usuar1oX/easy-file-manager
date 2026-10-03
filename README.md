@@ -32,3 +32,5 @@ Luego, copia el hash resultante y pégalo en el array 'users' de api/config.php
 
 ## Protección de subidas
 Debes proteger el directorio donde se suben las imágenes para evitar ejecución de scripts. Copia el archivo `media.htaccess` de la raíz del proyecto y pégalo como `.htaccess` dentro de la carpeta de subidas de tu servidor web.
+
+Ten en cuenta que el listado público de la carpeta es opcional (las 3 primeras líneas del archivo). Sin embargo, la directiva `DirectoryIndex disabled` es obligatoria si se deja activo el bloqueo de archivos `.html`/`.php`, para evitar que Apache intente resolver un archivo índice bloqueado y arroje un error 403 al abrir la carpeta.

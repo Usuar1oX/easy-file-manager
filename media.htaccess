@@ -1,7 +1,13 @@
-# Bloquear la ejecución de scripts PHP y otros en la carpeta de subidas
-<FilesMatch "\.(php|php3|php4|php5|phtml|pl|py|jsp|asp|htm|html|shtml|sh|cgi)$">
+# Permitir explorar la carpeta (listado público). Comenta estas 3 líneas si no quieres listado.
+Options +Indexes
+IndexOptions +HTMLTable +FancyIndexing
+# Necesario: sin esto Apache busca index.html/index.php, la regla de abajo los bloquea y la carpeta da 403
+DirectoryIndex disabled
+
+# Ocultar archivos del sistema en el listado
+IndexIgnore .htaccess .ftpquota
+
+# Seguridad: nunca ejecutar ni servir scripts/páginas subidos aquí
+<FilesMatch "\.(php|php3|php4|php5|phtml|phar|pl|py|jsp|asp|htm|html|shtml|sh|cgi)$">
     Require all denied
 </FilesMatch>
-
-# Opcional: forzar que los archivos se descarguen en lugar de interpretarse
-# AddType application/octet-stream .php .php3 .php4 .php5 .phtml
