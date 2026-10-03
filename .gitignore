@@ -1,5 +1,5 @@
 ﻿# Ignorar la configuración privada y base de datos
-api/config.json
+api/config.php
 
 # Ignorar la carpeta de subidas por defecto si está dentro del proyecto
 uploads/

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once 'config.php';
 requireAuth();
 
@@ -48,8 +48,8 @@ function copyDir($src, $dst) {
 function normalizeSearchText($text) {
     $lower = mb_strtolower($text, 'UTF-8');
     return strtr($lower, [
-        'á'=>'a', 'é'=>'e', 'í'=>'i', 'ó'=>'o', 'ú'=>'u', 'ü'=>'u', 'ñ'=>'n',
-        'Á'=>'a', 'É'=>'e', 'Í'=>'i', 'Ó'=>'o', 'Ú'=>'u', 'Ü'=>'u', 'Ñ'=>'n'
+        'Ã¡'=>'a', 'Ã©'=>'e', 'Ã­'=>'i', 'Ã³'=>'o', 'Ãº'=>'u', 'Ã¼'=>'u', 'Ã±'=>'n',
+        'Ã'=>'a', 'Ã‰'=>'e', 'Ã'=>'i', 'Ã“'=>'o', 'Ãš'=>'u', 'Ãœ'=>'u', 'Ã‘'=>'n'
     ]);
 }
 
