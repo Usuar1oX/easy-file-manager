@@ -1,4 +1,4 @@
-# Imagenes Easy Way (Easy File Manager)
+# Easy File Manager
 
 Un gestor de archivos e imágenes minimalista, rápido y moderno en un solo archivo HTML y unos pocos scripts PHP en el backend.
 
