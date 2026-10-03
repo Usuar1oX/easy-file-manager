@@ -3,7 +3,7 @@
 return [
     // Directorio donde se guardan los archivos (relativo a la carpeta api)
     // '../' significa la carpeta raíz del proyecto
-    'media_dir' => '../',
+    'media_dir' => '../media',
     
     // Usuarios que pueden acceder al sistema
     // 'usuario' => 'contraseña'
