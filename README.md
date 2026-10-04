@@ -10,13 +10,17 @@ Un gestor de archivos e imágenes minimalista, rápido y moderno en un solo arch
 4. Edita `config.php` y cambia el nombre de usuario y contraseña por defecto.
 5. (Opcional) Cambia la ruta `media_dir` en `config.php` para decidir dónde se guardan físicamente los archivos. Por defecto los guardará en la misma carpeta raíz.
 6. (Opcional) Agrega `'hidden_files' => ['archivo.ext']` en `config.php` si deseas ocultar archivos o carpetas adicionales en el explorador y protegerlos contra edición o borrado desde la API. El sistema ya oculta y protege de forma predeterminada todos los elementos que comienzan con punto (como `.htaccess`, `.ftpquota`, etc.).
+7. (Opcional) Ajusta `'max_width'` (límite del lado mayor para fotos horizontales y verticales, por defecto 1920) y `'webp_quality'` (calidad de compresión WebP, por defecto 75).
 
 ## Estructura
 - `index.html`: Toda la interfaz de usuario en una Single Page Application.
 - `api/`: Los endpoints de backend en PHP.
 
 ## Características
-- Compresión automática a WebP.
+- Compresión automática a WebP con calidad configurable (`webp_quality`).
+- Redimensionamiento proporcional por el lado mayor (horizontal y vertical).
+- Generación automática de versión mediana `-800` (lado mayor 800 px) para miniaturas y tarjetas responsive con `srcset`.
+- Visualización de peso en KB y dimensiones en cada imagen, con indicador destacado en naranja para imágenes superiores a 300 KB.
 - Drag and drop (arrastrar y soltar).
 - Bulk actions (seleccionar varios para borrar, mover o copiar enlace).
 - Navegación rápida sin recargas.

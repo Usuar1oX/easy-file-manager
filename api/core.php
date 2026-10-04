@@ -25,6 +25,7 @@ define('MEDIA_DIR', __DIR__ . '/' . ($config['media_dir'] ?? '../../media'));
 define('MAX_FILE_SIZE', $config['max_file_size'] ?? 50 * 1024 * 1024); // 50MB
 define('RESIZE_THRESHOLD', $config['resize_threshold'] ?? 5 * 1024 * 1024); // 5MB
 define('MAX_WIDTH', $config['max_width'] ?? 1920);
+define('WEBP_QUALITY', $config['webp_quality'] ?? 75);
 
 // Usuarios autorizados
 $users = $config['users'] ?? ['admin' => 'admin'];

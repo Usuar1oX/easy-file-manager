@@ -104,7 +104,7 @@ if ($method === 'GET') {
                     } else {
                         $fullPath = $fileInfo->getPathname();
                         $url = '/media/' . $subPath;
-                        $files[] = [
+                        $fileData = [
                             'name' => $filename,
                             'path' => $subPath,
                             'directory' => $parentDir,
@@ -112,6 +112,14 @@ if ($method === 'GET') {
                             'size' => $fileInfo->getSize(),
                             'type' => @mime_content_type($fullPath) ?: 'application/octet-stream'
                         ];
+                        if (preg_match('/\.(webp|jpe?g|png|gif)$/i', $filename)) {
+                            $imgInfo = @getimagesize($fullPath);
+                            if ($imgInfo && isset($imgInfo[0], $imgInfo[1])) {
+                                $fileData['width'] = $imgInfo[0];
+                                $fileData['height'] = $imgInfo[1];
+                            }
+                        }
+                        $files[] = $fileData;
                     }
 
                     if (count($folders) + count($files) >= $maxResults) {
@@ -158,13 +166,21 @@ if ($method === 'GET') {
                 'path' => $relativePath
             ];
         } else {
-            $files[] = [
+            $fileData = [
                 'name' => $item,
                 'path' => $relativePath,
                 'url' => $url,
                 'size' => filesize($itemPath),
                 'type' => mime_content_type($itemPath)
             ];
+            if (preg_match('/\.(webp|jpe?g|png|gif)$/i', $item)) {
+                $imgInfo = @getimagesize($itemPath);
+                if ($imgInfo && isset($imgInfo[0], $imgInfo[1])) {
+                    $fileData['width'] = $imgInfo[0];
+                    $fileData['height'] = $imgInfo[1];
+                }
+            }
+            $files[] = $fileData;
         }
     }
 
@@ -403,10 +419,16 @@ if ($method === 'GET') {
             $newHeight = $height;
 
             $fileSize = filesize($fullSourcePath);
-            if ($fileSize > RESIZE_THRESHOLD || $width > MAX_WIDTH) {
-                if ($width > MAX_WIDTH) {
-                    $newWidth = MAX_WIDTH;
-                    $newHeight = floor($height * (MAX_WIDTH / $width));
+            $maxSide = max($width, $height);
+            if ($fileSize > RESIZE_THRESHOLD || $maxSide > MAX_WIDTH) {
+                if ($maxSide > MAX_WIDTH) {
+                    if ($width >= $height) {
+                        $newWidth = MAX_WIDTH;
+                        $newHeight = (int)round($height * (MAX_WIDTH / $width));
+                    } else {
+                        $newHeight = MAX_WIDTH;
+                        $newWidth = (int)round($width * (MAX_WIDTH / $height));
+                    }
                 }
             }
 
@@ -428,10 +450,41 @@ if ($method === 'GET') {
             $finalName = $info['filename'] . '.webp';
             $finalPath = dirname($fullSourcePath) . '/' . $finalName;
 
-            $success = imagewebp($destinationImage, $finalPath, 80);
+            $success = imagewebp($destinationImage, $finalPath, WEBP_QUALITY);
+
+            // Generar versión mediana con sufijo "-800" (lado mayor 800 px)
+            $medWidth = $width;
+            $medHeight = $height;
+            if (max($width, $height) > 800) {
+                if ($width >= $height) {
+                    $medWidth = 800;
+                    $medHeight = (int)round($height * (800 / $width));
+                } else {
+                    $medHeight = 800;
+                    $medWidth = (int)round($width * (800 / $height));
+                }
+            }
+
+            $mediumImage = imagecreatetruecolor($medWidth, $medHeight);
+            imagealphablending($mediumImage, false);
+            imagesavealpha($mediumImage, true);
+            $transparentMed = imagecolorallocatealpha($mediumImage, 255, 255, 255, 127);
+            imagefilledrectangle($mediumImage, 0, 0, $medWidth, $medHeight, $transparentMed);
+
+            imagecopyresampled(
+                $mediumImage, $sourceImage,
+                0, 0, 0, 0,
+                $medWidth, $medHeight,
+                $width, $height
+            );
+
+            $mediumName = $info['filename'] . '-800.webp';
+            $mediumPath = dirname($fullSourcePath) . '/' . $mediumName;
+            imagewebp($mediumImage, $mediumPath, WEBP_QUALITY);
 
             imagedestroy($sourceImage);
             imagedestroy($destinationImage);
+            imagedestroy($mediumImage);
             
             if ($success) {
                 unlink($fullSourcePath); // Borrar el original

@@ -564,9 +564,23 @@
                 }
             },
 
+            updateImageDim(img, dimId) {
+                if (img && img.naturalWidth && img.naturalHeight) {
+                    const el = document.getElementById(dimId);
+                    if (el) {
+                        el.textContent = `${img.naturalWidth}×${img.naturalHeight}`;
+                    }
+                }
+            },
+
             createItemCard(item) {
                 const isFav = this.favorites.includes(item.path);
                 const isSelected = this.selectedItems.some(i => i.path === item.path);
+                const isImage = !item.isDirectory && item.url && item.name.match(/\.(webp|jpg|jpeg|png|gif)$/i);
+                const sizeKb = item.size ? Math.round(item.size / 1024) : 0;
+                const isOver300 = isImage && sizeKb > 300;
+                const dimId = 'dim_' + Math.random().toString(36).substring(2, 9);
+                let dimText = (item.width && item.height) ? `${item.width}×${item.height}` : '';
                 
                 const div = document.createElement('div');
                 div.className = 'group relative flex flex-col items-center p-3 rounded-xl hover:bg-neutral-100 cursor-pointer transition-colors border border-transparent hover:border-neutral-200';
@@ -589,8 +603,8 @@
                         }
                         this.navigateTo(item.path);
                     };
-                } else if (item.url && item.name.match(/\.(webp|jpg|jpeg|png|gif)$/i)) {
-                    iconHtml = `<img src="${item.url}" alt="${item.name}" class="w-full h-full object-cover" loading="lazy" />`;
+                } else if (isImage) {
+                    iconHtml = `<img src="${item.url}" alt="${item.name}" class="w-full h-full object-cover" loading="lazy" onload="app.updateImageDim(this, '${dimId}')" />`;
                     div.onclick = (e) => {
                         if (this.selectedItems.length > 0) {
                             e.stopPropagation();
@@ -674,15 +688,43 @@
                     </div>
                 `;
 
+                let thumbBoxClass = 'w-20 h-20 mb-2 flex items-center justify-center relative bg-neutral-50 rounded-lg overflow-hidden shadow-sm';
+                if (isOver300) {
+                    thumbBoxClass += ' border-2 border-orange-400 ring-2 ring-orange-200/60';
+                } else {
+                    thumbBoxClass += ' border border-neutral-100';
+                }
+
+                let over300Badge = isOver300 ? `
+                    <span class="absolute bottom-1 right-1 bg-orange-500 text-white text-[9px] font-bold px-1 py-0.5 rounded shadow leading-none" title="Pesa ${sizeKb} KB (más de 300 KB)">
+                        >300K
+                    </span>
+                ` : '';
+
+                let metaInfoHtml = '';
+                if (isImage) {
+                    metaInfoHtml = `
+                        <div class="flex items-center justify-center gap-1 mt-1 text-[11px] leading-tight flex-wrap">
+                            <span class="${isOver300 ? 'text-orange-700 bg-orange-100 font-bold px-1.5 py-0.5 rounded border border-orange-300' : 'text-neutral-500 font-medium'}">
+                                ${sizeKb} KB
+                            </span>
+                            <span class="text-neutral-300">•</span>
+                            <span id="${dimId}" class="text-neutral-500 font-mono text-[10px]">${dimText || '...'}</span>
+                        </div>
+                    `;
+                }
+
                 div.innerHTML = `
                     ${checkboxHtml}
                     ${favIndicator}
-                    <div class="w-20 h-20 mb-2 flex items-center justify-center relative bg-neutral-50 rounded-lg overflow-hidden shadow-sm border border-neutral-100">
+                    <div class="${thumbBoxClass}">
                         ${iconHtml}
+                        ${over300Badge}
                     </div>
                     <p class="text-xs font-medium text-center w-full truncate px-1 text-neutral-700 group-hover:text-neutral-900" title="${item.name}">
                         ${item.name}
                     </p>
+                    ${metaInfoHtml}
                     ${locationHtml}
                     ${actionsBtn}
                 `;
@@ -1179,13 +1221,30 @@
 
             updateLightboxImage(item) {
                 if (!item) return;
-                document.getElementById('lightboxImg').src = item.url;
+                const img = document.getElementById('lightboxImg');
+                img.src = item.url;
                 let finalUrl = item.url;
                 if(item.url.startsWith('/')) {
                    finalUrl = item.url.substring(1);
                 }
                 const fullUrl = window.location.origin + '/' + finalUrl;
-                document.getElementById('lightboxUrl').textContent = fullUrl;
+                
+                const sizeKb = item.size ? Math.round(item.size / 1024) : 0;
+                const isOver300 = sizeKb > 300;
+                let metaHtml = `<span class="break-all">${fullUrl}</span>`;
+                if (sizeKb) {
+                    const weightColor = isOver300 ? 'text-orange-400 font-bold' : 'text-neutral-300';
+                    metaHtml += ` <span class="text-neutral-500">•</span> <span class="${weightColor}">${sizeKb} KB</span>`;
+                }
+                metaHtml += ` <span class="text-neutral-500">•</span> <span id="lightboxDim" class="text-neutral-300 font-mono">${item.width && item.height ? `${item.width}×${item.height}px` : '...'}</span>`;
+                document.getElementById('lightboxUrl').innerHTML = metaHtml;
+
+                img.onload = () => {
+                    const dimEl = document.getElementById('lightboxDim');
+                    if (dimEl && img.naturalWidth && img.naturalHeight) {
+                        dimEl.textContent = `${img.naturalWidth}×${img.naturalHeight}px`;
+                    }
+                };
                 
                 document.getElementById('lbPrev').style.display = this.currentImageIndex > 0 ? 'flex' : 'none';
                 document.getElementById('lbNext').style.display = this.currentImageIndex >= 0 && this.currentImageIndex < this.imagesList.length - 1 ? 'flex' : 'none';
