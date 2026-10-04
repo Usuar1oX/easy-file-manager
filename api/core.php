@@ -32,11 +32,12 @@ $users = $config['users'] ?? ['admin' => 'admin'];
 
 // Reglas de optimización de imágenes (patrón, lado mayor máximo y calidad)
 $defaultOptimizeRules = [
-    ['pattern' => '*icono*',    'max_side' => 192,  'quality' => 80],
-    ['pattern' => '*favicon*',  'max_side' => 192,  'quality' => 80],
-    ['pattern' => '*logo*',     'max_side' => 800,  'quality' => 80],
-    ['pattern' => 'dominios/*', 'max_side' => 1600, 'quality' => 75],
-    ['pattern' => '*',          'max_side' => 1024, 'quality' => 70],
+    ['pattern' => '*icono*',         'max_side' => 192,  'quality' => 80],
+    ['pattern' => '*favicon*',       'max_side' => 192,  'quality' => 80],
+    ['pattern' => '*logo*',          'max_side' => 800,  'quality' => 80],
+    ['pattern' => '*portada-movil*', 'max_side' => 1280, 'quality' => 70],
+    ['pattern' => 'dominios/*',      'max_side' => 1600, 'quality' => 75],
+    ['pattern' => '*',               'max_side' => 1024, 'quality' => 70],
 ];
 $optimizeRules = $config['optimize_rules'] ?? $defaultOptimizeRules;
 if (!is_array($optimizeRules)) {
