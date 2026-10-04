@@ -119,7 +119,12 @@ if ($method === 'GET') {
                                 $fileData['width'] = $imgInfo[0];
                                 $fileData['height'] = $imgInfo[1];
                             }
-                            $fileData['is_optimized'] = file_exists(MEDIA_DIR . '/.originales/' . $subPath) || isset($registry[$subPath]);
+                            $hasBackup = file_exists(MEDIA_DIR . '/.originales/' . $subPath);
+                            if (!$hasBackup && isset($registry[$subPath]['original_convertido'])) {
+                                $hasBackup = file_exists(MEDIA_DIR . '/.originales/' . $registry[$subPath]['original_convertido']);
+                            }
+                            $fileData['has_backup'] = $hasBackup;
+                            $fileData['is_optimized'] = $hasBackup || isset($registry[$subPath]);
                             $fileData['is_pending_optimize'] = isImagePendingOptimization($subPath, $fullPath, null, $registry, $fileData['width'] ?? 0, $fileData['height'] ?? 0);
                         }
                         $files[] = $fileData;
@@ -138,7 +143,8 @@ if ($method === 'GET') {
             'isSearch' => true,
             'searchQuery' => $searchQuery,
             'folders' => $folders,
-            'files' => $files
+            'files' => $files,
+            'backups' => getBackupsInfo()
         ]);
         exit;
     }
@@ -182,7 +188,12 @@ if ($method === 'GET') {
                     $fileData['width'] = $imgInfo[0];
                     $fileData['height'] = $imgInfo[1];
                 }
-                $fileData['is_optimized'] = file_exists(MEDIA_DIR . '/.originales/' . $relativePath) || isset($registry[$relativePath]);
+                $hasBackup = file_exists(MEDIA_DIR . '/.originales/' . $relativePath);
+                if (!$hasBackup && isset($registry[$relativePath]['original_convertido'])) {
+                    $hasBackup = file_exists(MEDIA_DIR . '/.originales/' . $registry[$relativePath]['original_convertido']);
+                }
+                $fileData['has_backup'] = $hasBackup;
+                $fileData['is_optimized'] = $hasBackup || isset($registry[$relativePath]);
                 $fileData['is_pending_optimize'] = isImagePendingOptimization($relativePath, $itemPath, null, $registry, $fileData['width'] ?? 0, $fileData['height'] ?? 0);
             }
             $files[] = $fileData;
@@ -192,7 +203,8 @@ if ($method === 'GET') {
     echo json_encode([
         'currentPath' => $pathParam,
         'folders' => $folders,
-        'files' => $files
+        'files' => $files,
+        'backups' => getBackupsInfo()
     ]);
 
 } else if ($method === 'POST') {

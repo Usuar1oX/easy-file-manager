@@ -82,6 +82,10 @@
                             <i data-feather="zap" class="w-4 h-4 text-amber-500 fill-amber-500/20"></i> <span class="hidden sm:inline">Optimizar</span>
                             <span id="pendingCountBadge" class="hidden text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded-full border border-amber-200"></span>
                         </button>
+                        <button id="btnPurgeBackups" onclick="app.purgeBackups()" class="hidden items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-red-600 bg-white border border-neutral-200 px-3 py-1.5 rounded-lg shadow-sm transition-all hover:bg-red-50 whitespace-nowrap" title="Vaciar respaldos">
+                            <i data-feather="trash" class="w-4 h-4 text-neutral-400"></i>
+                            <span id="purgeBackupsLabel">Vaciar respaldos</span>
+                        </button>
                         <button id="btnNewFolder" onclick="app.toggleNewFolder(true)" class="flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 bg-white border border-neutral-200 px-3 py-1.5 rounded-lg shadow-sm transition-all hover:shadow whitespace-nowrap" title="Crear nueva carpeta">
                             <i data-feather="folder-plus" class="w-4 h-4"></i> <span class="hidden lg:inline">Nueva Carpeta</span>
                         </button>
@@ -487,6 +491,7 @@
                         ];
 
                         bannerText.innerHTML = `Resultados en todo el catálogo para <i>"${this.escapeHtml(query)}"</i>: <b>${items.length}</b> encontrado${items.length === 1 ? '' : 's'}`;
+                        this.updateBackupsInfo(data.backups);
                         this.renderItems(items);
                     } else if (res.status === 401) {
                         this.logout();
@@ -565,6 +570,7 @@
                             ...(data.folders || []).map(f => ({...f, isDirectory: true})),
                             ...(data.files || []).map(f => ({...f, isDirectory: false}))
                         ];
+                        this.updateBackupsInfo(data.backups);
                         
                         const query = document.getElementById('searchInput') ? document.getElementById('searchInput').value.trim() : '';
                         if (query) {
@@ -797,7 +803,7 @@
                         <button onclick="event.stopPropagation(); app.toggleFavorite('${item.path}')" class="bg-white/90 p-1.5 rounded-md shadow backdrop-blur-sm hover:bg-white ${isFav ? 'text-yellow-500' : 'text-neutral-700'}" title="${isFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}">
                             <i data-feather="star" class="w-3.5 h-3.5" ${isFav ? 'fill="currentColor"' : ''}></i>
                         </button>
-                        ${!item.isDirectory && item.is_optimized ? `
+                        ${!item.isDirectory && item.has_backup ? `
                         <button onclick="event.stopPropagation(); app.restoreOriginal('${item.path}')" class="bg-white/90 p-1.5 rounded-md shadow backdrop-blur-sm hover:bg-amber-50 text-amber-600" title="Restaurar archivo original (antes de optimizar)">
                             <i data-feather="rotate-ccw" class="w-3.5 h-3.5"></i>
                         </button>
@@ -1413,7 +1419,7 @@
                     </button>
                 `;
                 
-                if (item.is_optimized) {
+                if (item.has_backup) {
                     html += `
                         <button onclick="app.restoreOriginal('${item.path}')" class="text-white hover:text-amber-400 bg-white/10 p-2 rounded-full backdrop-blur-md transition-colors" title="Restaurar imagen original (deshacer optimización)">
                             <i data-feather="rotate-ccw" class="w-5 h-5"></i>
@@ -1779,6 +1785,7 @@
                     if (res.ok && data.success) {
                         alert('¡Archivo original restaurado con éxito!');
                         if (this.currentImageIndex >= 0 && this.imagesList[this.currentImageIndex]) {
+                            this.imagesList[this.currentImageIndex].has_backup = false;
                             this.imagesList[this.currentImageIndex].is_optimized = false;
                             this.renderLightboxActions(this.imagesList[this.currentImageIndex]);
                         }
@@ -1789,6 +1796,45 @@
                 } catch (e) {
                     alert('Error de conexión: ' + e.message);
                 }
+            },
+
+            async purgeBackups() {
+                if (!confirm('Esto borra las copias originales; ya no podrás restaurar. ¿Continuar?')) return;
+
+                try {
+                    const res = await fetch('api/optimize.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'purge_backups' })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        alert(`Respaldos vaciados con éxito. Se eliminaron ${data.deleted_files} archivo(s) y se liberaron ${this.formatBytes(data.freed_bytes)}.`);
+                        this.refreshView();
+                    } else {
+                        alert('Error al vaciar respaldos: ' + (data.error || 'Error en el servidor'));
+                    }
+                } catch (e) {
+                    alert('Error de conexión: ' + e.message);
+                }
+            },
+
+            updateBackupsInfo(backups) {
+                const purgeBtn = document.getElementById('btnPurgeBackups');
+                const purgeLabel = document.getElementById('purgeBackupsLabel');
+                if (!purgeBtn) return;
+                if (backups && backups.count > 0) {
+                    purgeBtn.classList.remove('hidden');
+                    purgeBtn.classList.add('flex');
+                    if (purgeLabel) {
+                        purgeLabel.textContent = `Vaciar respaldos (${backups.count} • ${this.formatBytes(backups.size)})`;
+                    }
+                    purgeBtn.title = `Vaciar ${backups.count} respaldos (${this.formatBytes(backups.size)}) de .originales`;
+                } else {
+                    purgeBtn.classList.add('hidden');
+                    purgeBtn.classList.remove('flex');
+                }
+                try { if (typeof feather !== 'undefined') feather.replace(); } catch(e){}
             }
         };
 

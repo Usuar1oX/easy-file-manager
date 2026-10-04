@@ -417,3 +417,23 @@ function isImagePendingOptimization($relPath, $fullPath = null, $rule = null, $r
     return false;
 }
 
+function getBackupsInfo() {
+    $origDir = realpath(MEDIA_DIR . '/.originales');
+    $count = 0;
+    $size = 0;
+    if ($origDir && is_dir($origDir)) {
+        try {
+            $dirIt = new RecursiveDirectoryIterator($origDir, FilesystemIterator::SKIP_DOTS);
+            $it = new RecursiveIteratorIterator($dirIt, RecursiveIteratorIterator::SELF_FIRST);
+            foreach ($it as $item) {
+                if ($item->isDir() || $item->isLink()) continue;
+                $fn = $item->getFilename();
+                if ($fn === '.htaccess' || $fn === '.optimizadas.json') continue;
+                $count++;
+                $size += $item->getSize();
+            }
+        } catch (Exception $e) {}
+    }
+    return ['count' => $count, 'size' => $size];
+}
+

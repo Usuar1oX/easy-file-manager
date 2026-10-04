@@ -504,15 +504,31 @@ if ($action === 'analyze') {
     $relPath = $safeRelPath;
 
     $backupPath = MEDIA_DIR . '/.originales/' . $relPath;
+    $targetRestoreRel = $relPath;
+    $isConvertedFromOther = false;
+
+    if (!file_exists($backupPath)) {
+        $registry = getOptimizedRegistry();
+        if (isset($registry[$relPath]['original_convertido'])) {
+            $origConv = $registry[$relPath]['original_convertido'];
+            $altBackup = MEDIA_DIR . '/.originales/' . $origConv;
+            if (file_exists($altBackup)) {
+                $backupPath = $altBackup;
+                $targetRestoreRel = $origConv;
+                $isConvertedFromOther = true;
+            }
+        }
+    }
+
     if (!file_exists($backupPath)) {
         http_response_code(404);
         echo json_encode(['error' => 'No existe copia en .originales para este archivo']);
         exit;
     }
 
-    $fullDest = resolveSecurePath($relPath);
+    $fullDest = resolveSecurePath($targetRestoreRel);
     if ($fullDest === false) {
-        $fullDest = resolveSecureParentPath($relPath);
+        $fullDest = resolveSecureParentPath($targetRestoreRel);
     }
 
     if ($fullDest === false) {
@@ -530,6 +546,15 @@ if ($action === 'analyze') {
         @unlink($backupPath);
         removeOptimizedRegistryEntry($relPath);
 
+        // Si era una imagen convertida desde JPG/PNG, borrar el .webp generado
+        if ($isConvertedFromOther) {
+            $webpCurrent = resolveSecurePath($relPath);
+            if ($webpCurrent && file_exists($webpCurrent)) {
+                @unlink($webpCurrent);
+            }
+            removeOptimizedRegistryEntry($targetRestoreRel);
+        }
+
         // Limpiar carpetas vacías en .originales
         $parentBackup = dirname($backupPath);
         $rootBackup = realpath(MEDIA_DIR . '/.originales');
@@ -546,7 +571,7 @@ if ($action === 'analyze') {
         echo json_encode([
             'success' => true,
             'message' => 'Archivo original restaurado con éxito',
-            'path' => $relPath
+            'path' => $targetRestoreRel
         ]);
         exit;
     } else {
@@ -554,8 +579,57 @@ if ($action === 'analyze') {
         echo json_encode(['error' => 'Error al restaurar archivo desde .originales']);
         exit;
     }
+} else if ($action === 'purge_backups') {
+    if ($method !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['error' => 'Método no permitido']);
+        exit;
+    }
+
+    $origDir = realpath(MEDIA_DIR . '/.originales');
+    if (!$origDir || !is_dir($origDir)) {
+        echo json_encode(['success' => true, 'deleted_files' => 0, 'freed_bytes' => 0]);
+        exit;
+    }
+
+    $deletedCount = 0;
+    $freedBytes = 0;
+
+    try {
+        $dirIt = new RecursiveDirectoryIterator($origDir, FilesystemIterator::SKIP_DOTS);
+        $it = new RecursiveIteratorIterator($dirIt, RecursiveIteratorIterator::CHILD_FIRST);
+
+        foreach ($it as $item) {
+            $filename = $item->getFilename();
+            if ($filename === '.htaccess' || $filename === '.optimizadas.json') {
+                continue;
+            }
+
+            if ($item->isDir()) {
+                @rmdir($item->getPathname());
+            } else {
+                $fileSize = $item->getSize();
+                if (@unlink($item->getPathname())) {
+                    $deletedCount++;
+                    $freedBytes += $fileSize;
+                }
+            }
+        }
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Error al vaciar respaldos: ' . $e->getMessage()]);
+        exit;
+    }
+
+    echo json_encode([
+        'success' => true,
+        'deleted_files' => $deletedCount,
+        'freed_bytes' => $freedBytes
+    ]);
+    exit;
 } else {
     http_response_code(400);
     echo json_encode(['error' => 'Acción no válida o no especificada']);
     exit;
 }
+
