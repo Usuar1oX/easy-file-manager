@@ -78,6 +78,9 @@
                             <div class="h-4 w-px bg-blue-200"></div>
                             <button type="button" onclick="app.clearClipboard()" class="px-2 py-1.5 hover:bg-blue-100 text-blue-500 hover:text-red-600 transition-colors" title="Cancelar"><i data-feather="x" class="w-3.5 h-3.5"></i></button>
                         </div>
+                        <button id="btnOptimize" onclick="app.openOptimizeModal()" class="flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 bg-white border border-neutral-200 px-3 py-1.5 rounded-lg shadow-sm transition-all hover:bg-neutral-50 whitespace-nowrap" title="Optimizar imágenes en la carpeta actual">
+                            <i data-feather="zap" class="w-4 h-4 text-amber-500 fill-amber-500/20"></i> <span class="hidden sm:inline">Optimizar</span>
+                        </button>
                         <button id="btnNewFolder" onclick="app.toggleNewFolder(true)" class="flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 bg-white border border-neutral-200 px-3 py-1.5 rounded-lg shadow-sm transition-all hover:shadow whitespace-nowrap" title="Crear nueva carpeta">
                             <i data-feather="folder-plus" class="w-4 h-4"></i> <span class="hidden lg:inline">Nueva Carpeta</span>
                         </button>
@@ -157,6 +160,131 @@
                     </div>
                 </div>
                 <div id="uploadPanelList" class="max-h-64 overflow-y-auto p-2 space-y-1 bg-white hide-scrollbar"></div>
+            </div>
+        </div>
+
+        <!-- OPTIMIZE MODAL -->
+        <div id="optimizeModal" class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs hidden" onclick="if(event.target===this) app.closeOptimizeModal()">
+            <div class="bg-white rounded-2xl shadow-2xl border border-neutral-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <!-- Header -->
+                <div class="px-6 py-4 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/70">
+                    <div class="flex items-center gap-2.5">
+                        <div class="bg-amber-100 text-amber-700 p-2 rounded-xl">
+                            <i data-feather="zap" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-neutral-900">Optimizar imágenes</h2>
+                            <p class="text-xs text-neutral-500" id="optScopeText">Carpeta: /</p>
+                        </div>
+                    </div>
+                    <button onclick="app.closeOptimizeModal()" class="text-neutral-400 hover:text-neutral-700 p-1.5 rounded-lg transition-colors">
+                        <i data-feather="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Body -->
+                <div class="p-6 overflow-y-auto flex-1 space-y-4" id="optModalBody">
+                    <!-- Option: include subfolders -->
+                    <div class="flex items-center justify-between p-3 rounded-xl bg-neutral-50 border border-neutral-200">
+                        <label for="optRecursiveCheckbox" class="text-sm font-medium text-neutral-700 flex items-center gap-2.5 cursor-pointer select-none">
+                            <input type="checkbox" id="optRecursiveCheckbox" onchange="app.onOptimizeRecursiveToggle()" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-neutral-300" />
+                            <span>Incluir subcarpetas (recursivo)</span>
+                        </label>
+                        <span class="text-xs text-neutral-400 font-mono" id="optRuleHint">Se aplican optimize_rules</span>
+                    </div>
+
+                    <!-- State 1: Loading / Analyzing -->
+                    <div id="optLoadingState" class="py-12 flex flex-col items-center justify-center gap-3">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-900"></div>
+                        <p class="text-sm font-medium text-neutral-600">Analizando imágenes en la carpeta...</p>
+                    </div>
+
+                    <!-- State 2: Analysis Results -->
+                    <div id="optAnalysisState" class="hidden space-y-4">
+                        <!-- Stats Grid -->
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div class="bg-neutral-50 border border-neutral-200/80 p-3 rounded-xl">
+                                <span class="text-[11px] font-medium text-neutral-400 uppercase tracking-wider block">Imágenes</span>
+                                <span class="text-lg font-bold text-neutral-800" id="optStatCount">0</span>
+                            </div>
+                            <div class="bg-neutral-50 border border-neutral-200/80 p-3 rounded-xl">
+                                <span class="text-[11px] font-medium text-neutral-400 uppercase tracking-wider block">Peso Actual</span>
+                                <span class="text-lg font-bold text-neutral-800" id="optStatCurrentSize">0 MB</span>
+                            </div>
+                            <div class="bg-neutral-50 border border-neutral-200/80 p-3 rounded-xl">
+                                <span class="text-[11px] font-medium text-neutral-400 uppercase tracking-wider block">Peso Estimado</span>
+                                <span class="text-lg font-bold text-neutral-800" id="optStatEstSize">0 MB</span>
+                            </div>
+                            <div class="bg-green-50 border border-green-200 p-3 rounded-xl">
+                                <span class="text-[11px] font-medium text-green-700 uppercase tracking-wider block">Ahorro Estimado</span>
+                                <span class="text-lg font-bold text-green-700" id="optStatSavings">0 MB</span>
+                            </div>
+                        </div>
+
+                        <!-- Info message about keeping paths and backup in .originales -->
+                        <div class="p-3 bg-blue-50/60 border border-blue-100 rounded-xl text-xs text-blue-800 flex items-start gap-2">
+                            <i data-feather="shield-check" class="w-4 h-4 text-blue-600 shrink-0 mt-0.5"></i>
+                            <div>
+                                <b>Seguridad de URLs:</b> Cada imagen conservará exactamente su mismo nombre, extensión y ruta. Se guardará una copia en <code class="bg-white/80 px-1 py-0.5 rounded text-blue-900 border border-blue-200">.originales</code> antes de reemplazar, y solo se aplicará si el ahorro es de al menos 10%.
+                            </div>
+                        </div>
+
+                        <!-- Preview list table -->
+                        <div class="border border-neutral-200 rounded-xl overflow-hidden">
+                            <div class="bg-neutral-100/70 px-4 py-2 text-xs font-semibold text-neutral-600 flex justify-between">
+                                <span>Lista de imágenes a optimizar</span>
+                                <span id="optListCounter">0 archivos</span>
+                            </div>
+                            <div class="max-h-56 overflow-y-auto divide-y divide-neutral-100 text-xs" id="optFileList"></div>
+                        </div>
+                    </div>
+
+                    <!-- State 3: Progress & Real-time Results -->
+                    <div id="optProgressState" class="hidden space-y-4">
+                        <div>
+                            <div class="flex justify-between text-xs font-medium text-neutral-600 mb-1.5">
+                                <span id="optProgressStatusText">Procesando lote...</span>
+                                <span id="optProgressPercent">0%</span>
+                            </div>
+                            <div class="w-full bg-neutral-200 rounded-full h-2 overflow-hidden">
+                                <div id="optProgressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="max-h-60 overflow-y-auto border border-neutral-200 rounded-xl divide-y divide-neutral-100 text-xs p-1" id="optLiveLog"></div>
+                    </div>
+
+                    <!-- State 4: Finished Summary -->
+                    <div id="optFinishedState" class="hidden space-y-4">
+                        <div class="p-4 bg-green-50 border border-green-200 rounded-2xl flex items-center gap-3">
+                            <div class="bg-green-600 text-white p-2 rounded-xl">
+                                <i data-feather="check-circle" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-green-900">¡Optimización completada con éxito!</h3>
+                                <p class="text-xs text-green-700 mt-0.5" id="optFinishedSummaryText"></p>
+                            </div>
+                        </div>
+                        <div id="optFailedListContainer" class="hidden space-y-2">
+                            <h4 class="text-xs font-bold text-red-600 uppercase tracking-wider">Archivos con error o no modificados:</h4>
+                            <div class="max-h-40 overflow-y-auto border border-red-200 bg-red-50/50 rounded-xl p-2 text-xs space-y-1" id="optFailedList"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="px-6 py-3.5 border-t border-neutral-100 bg-neutral-50/80 flex items-center justify-between" id="optModalFooter">
+                    <button type="button" onclick="app.closeOptimizeModal()" class="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors" id="optBtnCancel">
+                        Cancelar
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="optBtnStart" onclick="app.startBatchOptimization()" class="px-4 py-2 text-sm font-medium bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg shadow-sm transition-colors flex items-center gap-2 hidden">
+                            <i data-feather="zap" class="w-4 h-4"></i> <span>Iniciar optimización</span>
+                        </button>
+                        <button type="button" id="optBtnClose" onclick="app.closeOptimizeModal(true)" class="px-4 py-2 text-sm font-medium bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg shadow-sm transition-colors hidden">
+                            Cerrar y actualizar
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -651,6 +779,11 @@
                             <i data-feather="image" class="w-3.5 h-3.5"></i>
                         </button>
                         ` : ''}
+                        ${!item.isDirectory && item.is_optimized ? `
+                        <button onclick="event.stopPropagation(); app.restoreOriginal('${item.path}')" class="bg-white/90 p-1.5 rounded-md shadow backdrop-blur-sm hover:bg-amber-50 text-amber-600" title="Restaurar archivo original (antes de optimizar)">
+                            <i data-feather="rotate-ccw" class="w-3.5 h-3.5"></i>
+                        </button>
+                        ` : ''}
                         ${!item.isDirectory && item.url ? `
                         <button onclick="event.stopPropagation(); app.downloadFile('${item.url}', '${item.name}')" class="bg-white/90 p-1.5 rounded-md shadow backdrop-blur-sm hover:bg-blue-50 text-blue-600" title="Descargar">
                             <i data-feather="download" class="w-3.5 h-3.5"></i>
@@ -695,6 +828,12 @@
                     thumbBoxClass += ' border border-neutral-100';
                 }
 
+                let optBadge = item.is_optimized ? `
+                    <span class="absolute top-1 left-1 bg-amber-500 text-white text-[8px] font-bold px-1 py-0.5 rounded shadow leading-none" title="Optimizada (con copia en .originales)">
+                        OPT
+                    </span>
+                ` : '';
+
                 let over300Badge = isOver300 ? `
                     <span class="absolute bottom-1 right-1 bg-orange-500 text-white text-[9px] font-bold px-1 py-0.5 rounded shadow leading-none" title="Pesa ${sizeKb} KB (más de 300 KB)">
                         >300K
@@ -719,6 +858,7 @@
                     ${favIndicator}
                     <div class="${thumbBoxClass}">
                         ${iconHtml}
+                        ${optBadge}
                         ${over300Badge}
                     </div>
                     <p class="text-xs font-medium text-center w-full truncate px-1 text-neutral-700 group-hover:text-neutral-900" title="${item.name}">
@@ -1237,6 +1377,9 @@
                     metaHtml += ` <span class="text-neutral-500">•</span> <span class="${weightColor}">${sizeKb} KB</span>`;
                 }
                 metaHtml += ` <span class="text-neutral-500">•</span> <span id="lightboxDim" class="text-neutral-300 font-mono">${item.width && item.height ? `${item.width}×${item.height}px` : '...'}</span>`;
+                if (item.is_optimized) {
+                    metaHtml += ` <span class="bg-amber-500/20 text-amber-300 text-[10px] font-semibold px-2 py-0.5 rounded border border-amber-400/30">Optimizada</span>`;
+                }
                 document.getElementById('lightboxUrl').innerHTML = metaHtml;
 
                 img.onload = () => {
@@ -1264,6 +1407,14 @@
                     </button>
                 `;
                 
+                if (item.is_optimized) {
+                    html += `
+                        <button onclick="app.restoreOriginal('${item.path}')" class="text-white hover:text-amber-400 bg-white/10 p-2 rounded-full backdrop-blur-md transition-colors" title="Restaurar imagen original (deshacer optimización)">
+                            <i data-feather="rotate-ccw" class="w-5 h-5"></i>
+                        </button>
+                    `;
+                }
+
                 if (item.name.match(/\.(jpg|jpeg|png)$/i)) {
                     html += `
                         <button onclick="app.convertToWebP('${item.path}')" class="text-white hover:text-green-400 bg-white/10 p-2 rounded-full backdrop-blur-md transition-colors" title="Convertir a WebP">
@@ -1322,6 +1473,250 @@
                 document.getElementById('lightboxImg').src = '';
                 if (this._keydownHandler) {
                     window.removeEventListener('keydown', this._keydownHandler);
+                }
+            },
+
+            formatBytes(bytes) {
+                if (!bytes || bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
+            },
+
+            _pendingOptimizeFiles: [],
+
+            openOptimizeModal() {
+                const modal = document.getElementById('optimizeModal');
+                if (!modal) return;
+                modal.classList.remove('hidden');
+
+                const folderDisplay = this.currentPath ? '/' + this.currentPath : '/';
+                document.getElementById('optScopeText').textContent = 'Carpeta actual: ' + folderDisplay;
+                document.getElementById('optRecursiveCheckbox').checked = false;
+
+                this.runOptimizeAnalysis();
+            },
+
+            closeOptimizeModal(shouldRefresh = false) {
+                const modal = document.getElementById('optimizeModal');
+                if (!modal) return;
+                modal.classList.add('hidden');
+                if (shouldRefresh) {
+                    this.refreshView();
+                }
+            },
+
+            onOptimizeRecursiveToggle() {
+                this.runOptimizeAnalysis();
+            },
+
+            async runOptimizeAnalysis() {
+                document.getElementById('optLoadingState').classList.remove('hidden');
+                document.getElementById('optAnalysisState').classList.add('hidden');
+                document.getElementById('optProgressState').classList.add('hidden');
+                document.getElementById('optFinishedState').classList.add('hidden');
+                document.getElementById('optBtnStart').classList.add('hidden');
+                document.getElementById('optBtnClose').classList.add('hidden');
+                document.getElementById('optBtnCancel').classList.remove('hidden');
+
+                const recursive = document.getElementById('optRecursiveCheckbox').checked;
+
+                try {
+                    const res = await fetch(`api/optimize.php?action=analyze&path=${encodeURIComponent(this.currentPath)}&recursive=${recursive ? '1' : '0'}`);
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.error || 'Error al analizar la carpeta');
+                    }
+                    const data = await res.json();
+                    this._pendingOptimizeFiles = data.files || [];
+
+                    document.getElementById('optLoadingState').classList.add('hidden');
+                    document.getElementById('optAnalysisState').classList.remove('hidden');
+
+                    document.getElementById('optStatCount').textContent = data.total_images || 0;
+                    document.getElementById('optStatCurrentSize').textContent = this.formatBytes(data.total_size || 0);
+                    document.getElementById('optStatEstSize').textContent = this.formatBytes(data.estimated_total_size || 0);
+                    
+                    const savings = data.estimated_savings || 0;
+                    const savingsPct = data.total_size > 0 ? Math.round((savings / data.total_size) * 100) : 0;
+                    document.getElementById('optStatSavings').textContent = `${this.formatBytes(savings)} (${savingsPct}%)`;
+
+                    const listContainer = document.getElementById('optFileList');
+                    listContainer.innerHTML = '';
+                    document.getElementById('optListCounter').textContent = `${this._pendingOptimizeFiles.length} archivos`;
+
+                    if (this._pendingOptimizeFiles.length === 0) {
+                        listContainer.innerHTML = `<div class="p-4 text-center text-neutral-400">No se encontraron imágenes optimizables (.webp, .jpg, .jpeg, .png) en esta ubicación.</div>`;
+                    } else {
+                        document.getElementById('optBtnStart').classList.remove('hidden');
+                        document.getElementById('optBtnStart').innerHTML = `<i data-feather="zap" class="w-4 h-4"></i> <span>Optimizar ${this._pendingOptimizeFiles.length} imágenes</span>`;
+
+                        this._pendingOptimizeFiles.forEach(f => {
+                            const row = document.createElement('div');
+                            row.className = 'px-4 py-2 flex items-center justify-between hover:bg-neutral-50 transition-colors';
+                            const origKb = Math.round(f.size / 1024);
+                            const estKb = Math.round(f.estimated_size / 1024);
+                            const dim = (f.width && f.height) ? `${f.width}×${f.height}` : '';
+                            const ruleDesc = `Regla: ${f.rule.pattern} (max ${f.rule.max_side}px, Q${f.rule.quality})`;
+                            row.innerHTML = `
+                                <div class="overflow-hidden mr-3">
+                                    <p class="font-medium text-neutral-800 truncate" title="${f.path}">${f.name}</p>
+                                    <p class="text-[10px] text-neutral-400 truncate">${ruleDesc} ${dim ? '• ' + dim : ''}</p>
+                                </div>
+                                <div class="text-right shrink-0 font-mono text-[11px]">
+                                    <span class="text-neutral-500">${origKb} KB</span>
+                                    <span class="text-neutral-300">→</span>
+                                    <span class="text-green-600 font-bold">${estKb} KB</span>
+                                </div>
+                            `;
+                            listContainer.appendChild(row);
+                        });
+                    }
+                    try { if (typeof feather !== 'undefined') feather.replace(); } catch(e){}
+                } catch (e) {
+                    document.getElementById('optLoadingState').classList.add('hidden');
+                    alert('Error: ' + e.message);
+                }
+            },
+
+            async startBatchOptimization() {
+                if (!this._pendingOptimizeFiles || this._pendingOptimizeFiles.length === 0) return;
+                
+                const confirmed = confirm(`¿Estás seguro de optimizar ${this._pendingOptimizeFiles.length} imagen(es)?\n\n• Se mantendrán exactamente las mismas URLs y extensiones.\n• Se guardará copia del original en .originales.\n• Solo se reemplazará si se ahorra al menos un 10%.`);
+                if (!confirmed) return;
+
+                document.getElementById('optAnalysisState').classList.add('hidden');
+                document.getElementById('optProgressState').classList.remove('hidden');
+                document.getElementById('optBtnStart').classList.add('hidden');
+                document.getElementById('optBtnCancel').classList.add('hidden');
+
+                const total = this._pendingOptimizeFiles.length;
+                const filePaths = this._pendingOptimizeFiles.map(f => f.path);
+                const batchSize = 10;
+                let completed = 0;
+                let totalSavedBytes = 0;
+                let optimizedCount = 0;
+                let skippedCount = 0;
+                const failedList = [];
+
+                const logContainer = document.getElementById('optLiveLog');
+                logContainer.innerHTML = '';
+
+                const progressBar = document.getElementById('optProgressBar');
+                const percentText = document.getElementById('optProgressPercent');
+                const statusText = document.getElementById('optProgressStatusText');
+
+                for (let i = 0; i < filePaths.length; i += batchSize) {
+                    const batch = filePaths.slice(i, i + batchSize);
+                    statusText.textContent = `Procesando ${completed} de ${total} imágenes...`;
+                    
+                    try {
+                        const res = await fetch('api/optimize.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'optimize', files: batch })
+                        });
+                        
+                        if (!res.ok) {
+                            throw new Error('Error en respuesta de servidor (' + res.status + ')');
+                        }
+                        const data = await res.json();
+                        
+                        (data.processed || []).forEach(p => {
+                            completed++;
+                            const itemEl = document.createElement('div');
+                            itemEl.className = 'p-2 flex items-center justify-between';
+                            const fname = p.path.split('/').pop();
+                            if (p.optimized) {
+                                optimizedCount++;
+                                totalSavedBytes += p.saved_bytes;
+                                itemEl.innerHTML = `
+                                    <div class="truncate mr-2">
+                                        <span class="font-medium text-neutral-800">${fname}</span>
+                                        <span class="text-neutral-400 text-[10px] ml-1">(${Math.round(p.original_size/1024)} KB → ${Math.round(p.new_size/1024)} KB)</span>
+                                    </div>
+                                    <span class="bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded text-[10px] shrink-0">-${p.saved_percent}%</span>
+                                `;
+                            } else {
+                                skippedCount++;
+                                itemEl.innerHTML = `
+                                    <div class="truncate mr-2">
+                                        <span class="text-neutral-600">${fname}</span>
+                                        <span class="text-neutral-400 text-[10px] ml-1">(${p.reason || 'Sin reducción'})</span>
+                                    </div>
+                                    <span class="bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded text-[10px] shrink-0">Sin cambio</span>
+                                `;
+                            }
+                            logContainer.appendChild(itemEl);
+                            itemEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        });
+
+                        (data.errors || []).forEach(err => {
+                            completed++;
+                            failedList.push(err);
+                            const itemEl = document.createElement('div');
+                            itemEl.className = 'p-2 flex items-center justify-between bg-red-50 text-red-700';
+                            itemEl.innerHTML = `
+                                <span class="truncate mr-2 font-medium">${err.path}</span>
+                                <span class="text-[10px] font-bold text-red-600 shrink-0">${err.error || 'Error'}</span>
+                            `;
+                            logContainer.appendChild(itemEl);
+                        });
+
+                    } catch (err) {
+                        batch.forEach(f => {
+                            completed++;
+                            failedList.push({ path: f, error: err.message });
+                        });
+                    }
+
+                    const pct = Math.round((completed / total) * 100);
+                    progressBar.style.width = `${pct}%`;
+                    percentText.textContent = `${pct}%`;
+                }
+
+                // Show finished state
+                document.getElementById('optProgressState').classList.add('hidden');
+                document.getElementById('optFinishedState').classList.remove('hidden');
+                document.getElementById('optBtnClose').classList.remove('hidden');
+
+                const summaryText = `Se optimizaron <b>${optimizedCount}</b> de <b>${total}</b> imágenes, logrando un ahorro real de <b>${this.formatBytes(totalSavedBytes)}</b>. ${skippedCount > 0 ? `(${skippedCount} no requirieron reemplazo por ahorro menor al 10%)` : ''}`;
+                document.getElementById('optFinishedSummaryText').innerHTML = summaryText;
+
+                const failedContainer = document.getElementById('optFailedListContainer');
+                const failedListEl = document.getElementById('optFailedList');
+                if (failedList.length > 0) {
+                    failedContainer.classList.remove('hidden');
+                    failedListEl.innerHTML = failedList.map(f => `<div>• <b>${f.path}</b>: ${f.error}</div>`).join('');
+                } else {
+                    failedContainer.classList.add('hidden');
+                }
+                try { if (typeof feather !== 'undefined') feather.replace(); } catch(e){}
+            },
+
+            async restoreOriginal(path) {
+                if (!confirm(`¿Deseas restaurar la versión original de esta imagen?\n\nSe recuperará el archivo original que estaba guardado en .originales.`)) return;
+
+                try {
+                    const res = await fetch('api/optimize.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'restore', path: path })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        alert('¡Archivo original restaurado con éxito!');
+                        if (this.currentImageIndex >= 0 && this.imagesList[this.currentImageIndex]) {
+                            this.imagesList[this.currentImageIndex].is_optimized = false;
+                            this.renderLightboxActions(this.imagesList[this.currentImageIndex]);
+                        }
+                        this.refreshView();
+                    } else {
+                        alert('Error al restaurar: ' + (data.error || 'Fallo en el servidor'));
+                    }
+                } catch (e) {
+                    alert('Error de conexión: ' + e.message);
                 }
             }
         };

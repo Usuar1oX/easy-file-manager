@@ -11,14 +11,17 @@ Un gestor de archivos e imágenes minimalista, rápido y moderno en un solo arch
 5. (Opcional) Cambia la ruta `media_dir` en `config.php` para decidir dónde se guardan físicamente los archivos. Por defecto los guardará en la misma carpeta raíz.
 6. (Opcional) Agrega `'hidden_files' => ['archivo.ext']` en `config.php` si deseas ocultar archivos o carpetas adicionales en el explorador y protegerlos contra edición o borrado desde la API. El sistema ya oculta y protege de forma predeterminada todos los elementos que comienzan con punto (como `.htaccess`, `.ftpquota`, etc.).
 7. (Opcional) Ajusta `'max_width'` (límite del lado mayor para fotos horizontales y verticales, por defecto 1920) y `'webp_quality'` (calidad de compresión WebP, por defecto 75).
+8. (Opcional) Configura reglas en `'optimize_rules'` para ajustar el tamaño máximo (`max_side`) y calidad (`quality`) según patrones de nombres o rutas (por ejemplo logos, iconos o fotos generales).
 
 ## Estructura
 - `index.html`: Toda la interfaz de usuario en una Single Page Application.
-- `api/`: Los endpoints de backend en PHP.
+- `api/`: Los endpoints de backend en PHP (`auth.php`, `core.php`, `explorer.php`, `upload.php`, `optimize.php`).
 
 ## Características
 - Compresión automática a WebP con calidad configurable (`webp_quality`).
 - Redimensionamiento proporcional por el lado mayor (horizontal y vertical).
+- Herramienta **Optimizar imágenes**: analiza y optimiza por lotes las imágenes de una carpeta (y opcionalmente subcarpetas), conservando exactamente el mismo nombre, extensión y ruta para no romper enlaces existentes. Guarda una copia del original en `.originales` y solo reemplaza si se ahorra al menos un 10%.
+- Botón **Restaurar original** en el visor de cada imagen que haya sido optimizada.
 - Visualización de peso en KB y dimensiones en cada imagen, con indicador destacado en naranja para imágenes superiores a 300 KB.
 - Drag and drop (arrastrar y soltar).
 - Bulk actions (seleccionar varios para borrar, mover o copiar enlace).

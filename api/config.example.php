@@ -28,5 +28,15 @@ return [
     'hidden_files' => [
         // 'archivo_privado.ext',
         // 'carpeta_privada'
+    ],
+
+    // Reglas de optimización de imágenes (se evalúan en orden; gana la PRIMERA que coincida).
+    // Coincidencia con fnmatch insensible a mayúsculas sobre la ruta relativa a media_dir.
+    'optimize_rules' => [
+        ['pattern' => '*icono*',    'max_side' => 192,  'quality' => 80],
+        ['pattern' => '*favicon*',  'max_side' => 192,  'quality' => 80],
+        ['pattern' => '*logo*',     'max_side' => 800,  'quality' => 80],
+        ['pattern' => 'dominios/*', 'max_side' => 1600, 'quality' => 75],
+        ['pattern' => '*',          'max_side' => 1024, 'quality' => 70],
     ]
 ];

@@ -118,6 +118,7 @@ if ($method === 'GET') {
                                 $fileData['width'] = $imgInfo[0];
                                 $fileData['height'] = $imgInfo[1];
                             }
+                            $fileData['is_optimized'] = file_exists(MEDIA_DIR . '/.originales/' . $subPath);
                         }
                         $files[] = $fileData;
                     }
@@ -179,6 +180,7 @@ if ($method === 'GET') {
                     $fileData['width'] = $imgInfo[0];
                     $fileData['height'] = $imgInfo[1];
                 }
+                $fileData['is_optimized'] = file_exists(MEDIA_DIR . '/.originales/' . $relativePath);
             }
             $files[] = $fileData;
         }

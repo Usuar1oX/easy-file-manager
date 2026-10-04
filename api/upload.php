@@ -4,6 +4,9 @@ requireAuth();
 
 header('Content-Type: application/json');
 
+@set_time_limit(300);
+@ini_set('memory_limit', '256M');
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['error' => 'Method not allowed']);
@@ -214,17 +217,21 @@ if ($isImage) {
         $newWidth = $width;
         $newHeight = $height;
 
-        // Redimensionar por el lado mayor si es muy pesada o excede MAX_WIDTH
+        // Obtener regla de optimización correspondiente a la ruta destino
+        $relativeFilePath = $relativeDirPath === '' ? $finalName : $relativeDirPath . '/' . $finalName;
+        $rule = getOptimizeRuleForPath($relativeFilePath);
+        $maxSideLimit = (int)$rule['max_side'];
+        $uploadQuality = (int)$rule['quality'];
+
+        // Redimensionar por el lado mayor al max_side de la regla (sin agrandar)
         $maxSide = max($width, $height);
-        if ($file['size'] > RESIZE_THRESHOLD || $maxSide > MAX_WIDTH) {
-            if ($maxSide > MAX_WIDTH) {
-                if ($width >= $height) {
-                    $newWidth = MAX_WIDTH;
-                    $newHeight = (int)round($height * (MAX_WIDTH / $width));
-                } else {
-                    $newHeight = MAX_WIDTH;
-                    $newWidth = (int)round($width * (MAX_WIDTH / $height));
-                }
+        if ($maxSide > $maxSideLimit && $maxSide > 0) {
+            if ($width >= $height) {
+                $newWidth = $maxSideLimit;
+                $newHeight = (int)round($height * ($maxSideLimit / $width));
+            } else {
+                $newHeight = $maxSideLimit;
+                $newWidth = (int)round($width * ($maxSideLimit / $height));
             }
         }
 
@@ -243,7 +250,7 @@ if ($isImage) {
             $width, $height
         );
 
-        $success = imagewebp($destinationImage, $finalPath, WEBP_QUALITY);
+        $success = imagewebp($destinationImage, $finalPath, $uploadQuality);
 
         imagedestroy($sourceImage);
         imagedestroy($destinationImage);

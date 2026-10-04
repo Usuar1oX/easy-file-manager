@@ -13,7 +13,8 @@ $filesToDeploy = @(
     "api\core.php",
     "api\hash.php",
     "api\explorer.php",
-    "api\upload.php"
+    "api\upload.php",
+    "api\optimize.php"
 )
 
 foreach ($file in $filesToDeploy) {
@@ -29,4 +30,3 @@ foreach ($file in $filesToDeploy) {
 
 Write-Host "¡Despliegue completado con éxito!" -ForegroundColor Green
 Start-Sleep -Seconds 2
-

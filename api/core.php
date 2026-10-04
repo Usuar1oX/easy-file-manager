@@ -30,6 +30,37 @@ define('WEBP_QUALITY', $config['webp_quality'] ?? 75);
 // Usuarios autorizados
 $users = $config['users'] ?? ['admin' => 'admin'];
 
+// Reglas de optimización de imágenes (patrón, lado mayor máximo y calidad)
+$defaultOptimizeRules = [
+    ['pattern' => '*icono*',    'max_side' => 192,  'quality' => 80],
+    ['pattern' => '*favicon*',  'max_side' => 192,  'quality' => 80],
+    ['pattern' => '*logo*',     'max_side' => 800,  'quality' => 80],
+    ['pattern' => 'dominios/*', 'max_side' => 1600, 'quality' => 75],
+    ['pattern' => '*',          'max_side' => 1024, 'quality' => 70],
+];
+$optimizeRules = $config['optimize_rules'] ?? $defaultOptimizeRules;
+if (!is_array($optimizeRules)) {
+    $optimizeRules = $defaultOptimizeRules;
+}
+
+function getOptimizeRuleForPath($relativePath) {
+    global $optimizeRules;
+    $norm = str_replace('\\', '/', ltrim($relativePath, '/'));
+    $flags = defined('FNM_CASEFOLD') ? FNM_CASEFOLD : 0;
+    foreach ($optimizeRules as $rule) {
+        if (!isset($rule['pattern'])) continue;
+        $pattern = $rule['pattern'];
+        if (fnmatch($pattern, $norm, $flags) || fnmatch(mb_strtolower($pattern, 'UTF-8'), mb_strtolower($norm, 'UTF-8'))) {
+            return [
+                'pattern' => $rule['pattern'],
+                'max_side' => (int)($rule['max_side'] ?? 1024),
+                'quality' => (int)($rule['quality'] ?? 70),
+            ];
+        }
+    }
+    return ['pattern' => '*', 'max_side' => 1024, 'quality' => 70];
+}
+
 // Archivos o carpetas ocultos
 $hiddenFiles = $config['hidden_files'] ?? [];
 if (!is_array($hiddenFiles)) {
