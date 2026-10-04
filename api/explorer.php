@@ -452,39 +452,8 @@ if ($method === 'GET') {
 
             $success = imagewebp($destinationImage, $finalPath, WEBP_QUALITY);
 
-            // Generar versión mediana con sufijo "-800" (lado mayor 800 px)
-            $medWidth = $width;
-            $medHeight = $height;
-            if (max($width, $height) > 800) {
-                if ($width >= $height) {
-                    $medWidth = 800;
-                    $medHeight = (int)round($height * (800 / $width));
-                } else {
-                    $medHeight = 800;
-                    $medWidth = (int)round($width * (800 / $height));
-                }
-            }
-
-            $mediumImage = imagecreatetruecolor($medWidth, $medHeight);
-            imagealphablending($mediumImage, false);
-            imagesavealpha($mediumImage, true);
-            $transparentMed = imagecolorallocatealpha($mediumImage, 255, 255, 255, 127);
-            imagefilledrectangle($mediumImage, 0, 0, $medWidth, $medHeight, $transparentMed);
-
-            imagecopyresampled(
-                $mediumImage, $sourceImage,
-                0, 0, 0, 0,
-                $medWidth, $medHeight,
-                $width, $height
-            );
-
-            $mediumName = $info['filename'] . '-800.webp';
-            $mediumPath = dirname($fullSourcePath) . '/' . $mediumName;
-            imagewebp($mediumImage, $mediumPath, WEBP_QUALITY);
-
             imagedestroy($sourceImage);
             imagedestroy($destinationImage);
-            imagedestroy($mediumImage);
             
             if ($success) {
                 unlink($fullSourcePath); // Borrar el original

@@ -245,40 +245,8 @@ if ($isImage) {
 
         $success = imagewebp($destinationImage, $finalPath, WEBP_QUALITY);
 
-        // Generar versión mediana con sufijo "-800" (lado mayor 800 px) junto a la original
-        $medWidth = $width;
-        $medHeight = $height;
-        if (max($width, $height) > 800) {
-            if ($width >= $height) {
-                $medWidth = 800;
-                $medHeight = (int)round($height * (800 / $width));
-            } else {
-                $medHeight = 800;
-                $medWidth = (int)round($width * (800 / $height));
-            }
-        }
-
-        $mediumImage = imagecreatetruecolor($medWidth, $medHeight);
-        imagealphablending($mediumImage, false);
-        imagesavealpha($mediumImage, true);
-        $transparentMed = imagecolorallocatealpha($mediumImage, 255, 255, 255, 127);
-        imagefilledrectangle($mediumImage, 0, 0, $medWidth, $medHeight, $transparentMed);
-
-        imagecopyresampled(
-            $mediumImage, $sourceImage,
-            0, 0, 0, 0,
-            $medWidth, $medHeight,
-            $width, $height
-        );
-
-        $info = pathinfo($finalName);
-        $mediumName = $info['filename'] . '-800.webp';
-        $mediumPath = $targetPath . '/' . $mediumName;
-        imagewebp($mediumImage, $mediumPath, WEBP_QUALITY);
-
         imagedestroy($sourceImage);
         imagedestroy($destinationImage);
-        imagedestroy($mediumImage);
     } else {
         http_response_code(500);
         echo json_encode(['error' => 'Error procesando la imagen']);
@@ -299,12 +267,8 @@ if ($success) {
     if ($isImage) {
         $filePayload['width'] = $newWidth;
         $filePayload['height'] = $newHeight;
-        $filePayload['size'] = @filesize($finalPath) ?: 0;
-        $filePayload['medium'] = $mediumName;
-        $filePayload['medium_url'] = '/media/' . ($relativeDirPath === '' ? $mediumName : $relativeDirPath . '/' . $mediumName);
-    } else {
-        $filePayload['size'] = @filesize($finalPath) ?: 0;
     }
+    $filePayload['size'] = @filesize($finalPath) ?: 0;
     echo json_encode([
         'success' => true,
         'message' => 'File uploaded successfully',

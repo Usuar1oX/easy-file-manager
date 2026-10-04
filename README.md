@@ -19,7 +19,6 @@ Un gestor de archivos e imágenes minimalista, rápido y moderno en un solo arch
 ## Características
 - Compresión automática a WebP con calidad configurable (`webp_quality`).
 - Redimensionamiento proporcional por el lado mayor (horizontal y vertical).
-- Generación automática de versión mediana `-800` (lado mayor 800 px) para miniaturas y tarjetas responsive con `srcset`.
 - Visualización de peso en KB y dimensiones en cada imagen, con indicador destacado en naranja para imágenes superiores a 300 KB.
 - Drag and drop (arrastrar y soltar).
 - Bulk actions (seleccionar varios para borrar, mover o copiar enlace).
