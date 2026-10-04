@@ -80,6 +80,7 @@
                         </div>
                         <button id="btnOptimize" onclick="app.openOptimizeModal()" class="flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 bg-white border border-neutral-200 px-3 py-1.5 rounded-lg shadow-sm transition-all hover:bg-neutral-50 whitespace-nowrap" title="Optimizar imágenes en la carpeta actual">
                             <i data-feather="zap" class="w-4 h-4 text-amber-500 fill-amber-500/20"></i> <span class="hidden sm:inline">Optimizar</span>
+                            <span id="pendingCountBadge" class="hidden text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded-full border border-amber-200"></span>
                         </button>
                         <button id="btnNewFolder" onclick="app.toggleNewFolder(true)" class="flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 bg-white border border-neutral-200 px-3 py-1.5 rounded-lg shadow-sm transition-all hover:shadow whitespace-nowrap" title="Crear nueva carpeta">
                             <i data-feather="folder-plus" class="w-4 h-4"></i> <span class="hidden lg:inline">Nueva Carpeta</span>
@@ -138,6 +139,7 @@
             </div>
             <button onclick="app.copyToClipboardBulk('copy')" class="flex items-center gap-1.5 text-sm font-medium text-neutral-700 hover:text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"><i data-feather="copy" class="w-4 h-4"></i> <span class="hidden sm:inline">Copiar</span></button>
             <button onclick="app.copyToClipboardBulk('cut')" class="flex items-center gap-1.5 text-sm font-medium text-neutral-700 hover:text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"><i data-feather="scissors" class="w-4 h-4"></i> <span class="hidden sm:inline">Mover</span></button>
+            <button onclick="app.openOptimizeSelectionModal()" class="flex items-center gap-1.5 text-sm font-medium text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-3 py-1.5 rounded-lg transition-colors" title="Optimizar elementos seleccionados (imágenes y carpetas recursivo)"><i data-feather="zap" class="w-4 h-4"></i> <span class="hidden sm:inline">Optimizar selección</span></button>
             <button onclick="app.deleteBulk()" class="flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"><i data-feather="trash-2" class="w-4 h-4"></i> <span class="hidden sm:inline">Eliminar</span></button>
             <div class="w-px h-6 bg-neutral-200 ml-1"></div>
             <button onclick="app.clearSelection()" class="text-neutral-400 hover:text-neutral-700 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors" title="Cancelar selección"><i data-feather="x" class="w-4 h-4"></i></button>
@@ -184,19 +186,22 @@
 
                 <!-- Body -->
                 <div class="p-6 overflow-y-auto flex-1 space-y-4" id="optModalBody">
-                    <!-- Option: include subfolders -->
-                    <div class="flex items-center justify-between p-3 rounded-xl bg-neutral-50 border border-neutral-200">
-                        <label for="optRecursiveCheckbox" class="text-sm font-medium text-neutral-700 flex items-center gap-2.5 cursor-pointer select-none">
+                    <!-- Options: include subfolders & force reoptimize -->
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-neutral-50 border border-neutral-200 gap-2">
+                        <label for="optRecursiveCheckbox" class="text-sm font-medium text-neutral-700 flex items-center gap-2.5 cursor-pointer select-none" id="optRecursiveWrapper">
                             <input type="checkbox" id="optRecursiveCheckbox" onchange="app.onOptimizeRecursiveToggle()" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-neutral-300" />
                             <span>Incluir subcarpetas (recursivo)</span>
                         </label>
-                        <span class="text-xs text-neutral-400 font-mono" id="optRuleHint">Se aplican optimize_rules</span>
+                        <label for="optForceCheckbox" class="text-xs font-medium text-neutral-600 flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="optForceCheckbox" onchange="app.onOptimizeForceToggle()" class="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 border-neutral-300" />
+                            <span>Reoptimizar de todos modos</span>
+                        </label>
                     </div>
 
                     <!-- State 1: Loading / Analyzing -->
                     <div id="optLoadingState" class="py-12 flex flex-col items-center justify-center gap-3">
                         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-900"></div>
-                        <p class="text-sm font-medium text-neutral-600">Analizando imágenes en la carpeta...</p>
+                        <p class="text-sm font-medium text-neutral-600">Analizando imágenes pendientes...</p>
                     </div>
 
                     <!-- State 2: Analysis Results -->
@@ -225,7 +230,7 @@
                         <div class="p-3 bg-blue-50/60 border border-blue-100 rounded-xl text-xs text-blue-800 flex items-start gap-2">
                             <i data-feather="shield-check" class="w-4 h-4 text-blue-600 shrink-0 mt-0.5"></i>
                             <div>
-                                <b>Seguridad de URLs:</b> Cada imagen conservará exactamente su mismo nombre, extensión y ruta. Se guardará una copia en <code class="bg-white/80 px-1 py-0.5 rounded text-blue-900 border border-blue-200">.originales</code> antes de reemplazar, y solo se aplicará si el ahorro es de al menos 10%.
+                                <b>Optimización inteligente:</b> Todo archivo JPG/PNG se convertirá a WebP conservando el original en <code class="bg-white/80 px-1 py-0.5 rounded text-blue-900 border border-blue-200">.originales</code>. Las imágenes WebP conservan su nombre y ruta.
                             </div>
                         </div>
 
@@ -260,7 +265,7 @@
                                 <i data-feather="check-circle" class="w-6 h-6"></i>
                             </div>
                             <div>
-                                <h3 class="text-sm font-bold text-green-900">¡Optimización completada con éxito!</h3>
+                                <h3 class="text-sm font-bold text-green-900">¡Optimización finalizada!</h3>
                                 <p class="text-xs text-green-700 mt-0.5" id="optFinishedSummaryText"></p>
                             </div>
                         </div>
@@ -273,9 +278,14 @@
 
                 <!-- Footer Buttons -->
                 <div class="px-6 py-3.5 border-t border-neutral-100 bg-neutral-50/80 flex items-center justify-between" id="optModalFooter">
-                    <button type="button" onclick="app.closeOptimizeModal()" class="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors" id="optBtnCancel">
-                        Cancelar
-                    </button>
+                    <div>
+                        <button type="button" onclick="app.closeOptimizeModal()" class="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors" id="optBtnCancel">
+                            Cancelar
+                        </button>
+                        <button type="button" id="optBtnCancelBatch" onclick="app.cancelBatchOptimization()" class="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors border border-red-200 hidden">
+                            Cancelar proceso
+                        </button>
+                    </div>
                     <div class="flex items-center gap-2">
                         <button type="button" id="optBtnStart" onclick="app.startBatchOptimization()" class="px-4 py-2 text-sm font-medium bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg shadow-sm transition-colors flex items-center gap-2 hidden">
                             <i data-feather="zap" class="w-4 h-4"></i> <span>Iniciar optimización</span>
@@ -581,6 +591,8 @@
                 const emptyState = document.getElementById('emptyState');
 
                 if (!items || items.length === 0) {
+                    const pendingBadge = document.getElementById('pendingCountBadge');
+                    if (pendingBadge) pendingBadge.classList.add('hidden');
                     if (this.isSearchMode) {
                         emptyState.innerHTML = `
                             <i data-feather="search" class="w-12 h-12 mb-4 opacity-50 text-neutral-400"></i>
@@ -605,6 +617,17 @@
                 } else {
                     emptyState.classList.add('hidden');
                     this.imagesList = items.filter(i => !i.isDirectory && i.url && i.name.match(/\.(webp|jpg|jpeg|png|gif)$/i));
+                    
+                    const pendingCount = items.filter(i => !i.isDirectory && i.is_pending_optimize).length;
+                    const pendingBadge = document.getElementById('pendingCountBadge');
+                    if (pendingBadge) {
+                        if (pendingCount > 0) {
+                            pendingBadge.textContent = `${pendingCount} pendientes`;
+                            pendingBadge.classList.remove('hidden');
+                        } else {
+                            pendingBadge.classList.add('hidden');
+                        }
+                    }
                     
                     items.sort((a, b) => {
                         const aFav = this.favorites.includes(a.path);
@@ -774,11 +797,6 @@
                         <button onclick="event.stopPropagation(); app.toggleFavorite('${item.path}')" class="bg-white/90 p-1.5 rounded-md shadow backdrop-blur-sm hover:bg-white ${isFav ? 'text-yellow-500' : 'text-neutral-700'}" title="${isFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}">
                             <i data-feather="star" class="w-3.5 h-3.5" ${isFav ? 'fill="currentColor"' : ''}></i>
                         </button>
-                        ${!item.isDirectory && item.name.match(/\.(jpg|jpeg|png)$/i) ? `
-                        <button onclick="event.stopPropagation(); app.convertToWebP('${item.path}')" class="bg-white/90 p-1.5 rounded-md shadow backdrop-blur-sm hover:bg-green-50 text-green-600" title="Convertir a WebP (Reduce tamaño)">
-                            <i data-feather="image" class="w-3.5 h-3.5"></i>
-                        </button>
-                        ` : ''}
                         ${!item.isDirectory && item.is_optimized ? `
                         <button onclick="event.stopPropagation(); app.restoreOriginal('${item.path}')" class="bg-white/90 p-1.5 rounded-md shadow backdrop-blur-sm hover:bg-amber-50 text-amber-600" title="Restaurar archivo original (antes de optimizar)">
                             <i data-feather="rotate-ccw" class="w-3.5 h-3.5"></i>
@@ -828,11 +846,22 @@
                     thumbBoxClass += ' border border-neutral-100';
                 }
 
-                let optBadge = item.is_optimized ? `
-                    <span class="absolute top-1 left-1 bg-amber-500 text-white text-[8px] font-bold px-1 py-0.5 rounded shadow leading-none" title="Optimizada (con copia en .originales)">
-                        OPT
-                    </span>
-                ` : '';
+                let statusBadge = '';
+                if (isImage) {
+                    if (item.is_pending_optimize) {
+                        statusBadge = `
+                            <span class="absolute top-1 left-1 bg-amber-400 text-neutral-900 text-[8px] font-extrabold px-1 py-0.5 rounded shadow leading-none border border-amber-300 z-10" title="Sin optimizar">
+                                Sin optimizar
+                            </span>
+                        `;
+                    } else if (item.is_optimized) {
+                        statusBadge = `
+                            <span class="absolute top-1 left-1 bg-green-600 text-white text-[8px] font-bold px-1 py-0.5 rounded shadow leading-none z-10" title="Optimizada">
+                                OPT
+                            </span>
+                        `;
+                    }
+                }
 
                 let over300Badge = isOver300 ? `
                     <span class="absolute bottom-1 right-1 bg-orange-500 text-white text-[9px] font-bold px-1 py-0.5 rounded shadow leading-none" title="Pesa ${sizeKb} KB (más de 300 KB)">
@@ -858,7 +887,7 @@
                     ${favIndicator}
                     <div class="${thumbBoxClass}">
                         ${iconHtml}
-                        ${optBadge}
+                        ${statusBadge}
                         ${over300Badge}
                     </div>
                     <p class="text-xs font-medium text-center w-full truncate px-1 text-neutral-700 group-hover:text-neutral-900" title="${item.name}">
@@ -944,29 +973,6 @@
                     } else {
                         const data = await res.json();
                         alert('Error: ' + (data.error || 'No se pudo eliminar'));
-                    }
-                } catch (e) {
-                    alert('Error de conexión');
-                }
-            },
-
-            async convertToWebP(path) {
-                if (!confirm('¿Deseas convertir esta imagen a WebP? Se borrará el archivo original para ahorrar espacio.')) return;
-                
-                try {
-                    const res = await fetch('api/explorer.php', {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            action: 'convert_webp',
-                            sourcePath: path
-                        })
-                    });
-                    if (res.ok) {
-                        this.refreshView();
-                    } else {
-                        const data = await res.json();
-                        alert('Error: ' + (data.error || 'No se pudo convertir'));
                     }
                 } catch (e) {
                     alert('Error de conexión');
@@ -1415,14 +1421,6 @@
                     `;
                 }
 
-                if (item.name.match(/\.(jpg|jpeg|png)$/i)) {
-                    html += `
-                        <button onclick="app.convertToWebP('${item.path}')" class="text-white hover:text-green-400 bg-white/10 p-2 rounded-full backdrop-blur-md transition-colors" title="Convertir a WebP">
-                            <i data-feather="image" class="w-5 h-5"></i>
-                        </button>
-                    `;
-                }
-
                 html += `
                     <button onclick="app.downloadFile('${item.url}', '${item.name}')" class="text-white hover:text-blue-400 bg-white/10 p-2 rounded-full backdrop-blur-md transition-colors" title="Descargar">
                         <i data-feather="download" class="w-5 h-5"></i>
@@ -1485,15 +1483,38 @@
             },
 
             _pendingOptimizeFiles: [],
+            _optimizeTargets: null,
+            _cancelOptimization: false,
 
             openOptimizeModal() {
                 const modal = document.getElementById('optimizeModal');
                 if (!modal) return;
                 modal.classList.remove('hidden');
 
+                this._optimizeTargets = null;
+                const recWrapper = document.getElementById('optRecursiveWrapper');
+                if (recWrapper) recWrapper.classList.remove('hidden');
+                document.getElementById('optRecursiveCheckbox').checked = false;
+                document.getElementById('optForceCheckbox').checked = false;
+
                 const folderDisplay = this.currentPath ? '/' + this.currentPath : '/';
                 document.getElementById('optScopeText').textContent = 'Carpeta actual: ' + folderDisplay;
-                document.getElementById('optRecursiveCheckbox').checked = false;
+
+                this.runOptimizeAnalysis();
+            },
+
+            openOptimizeSelectionModal() {
+                if (!this.selectedItems || this.selectedItems.length === 0) return;
+                const modal = document.getElementById('optimizeModal');
+                if (!modal) return;
+                modal.classList.remove('hidden');
+
+                this._optimizeTargets = this.selectedItems.map(i => ({ path: i.path, is_dir: i.isDirectory }));
+                const recWrapper = document.getElementById('optRecursiveWrapper');
+                if (recWrapper) recWrapper.classList.add('hidden');
+                document.getElementById('optForceCheckbox').checked = false;
+
+                document.getElementById('optScopeText').textContent = `Selección múltiple: ${this.selectedItems.length} elemento(s) (carpetas e imágenes)`;
 
                 this.runOptimizeAnalysis();
             },
@@ -1503,12 +1524,26 @@
                 if (!modal) return;
                 modal.classList.add('hidden');
                 if (shouldRefresh) {
+                    this.clearSelection();
                     this.refreshView();
                 }
             },
 
             onOptimizeRecursiveToggle() {
                 this.runOptimizeAnalysis();
+            },
+
+            onOptimizeForceToggle() {
+                this.runOptimizeAnalysis();
+            },
+
+            cancelBatchOptimization() {
+                this._cancelOptimization = true;
+                const btn = document.getElementById('optBtnCancelBatch');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Deteniendo tras lote en curso...';
+                }
             },
 
             async runOptimizeAnalysis() {
@@ -1519,14 +1554,26 @@
                 document.getElementById('optBtnStart').classList.add('hidden');
                 document.getElementById('optBtnClose').classList.add('hidden');
                 document.getElementById('optBtnCancel').classList.remove('hidden');
+                document.getElementById('optBtnCancelBatch').classList.add('hidden');
 
-                const recursive = document.getElementById('optRecursiveCheckbox').checked;
+                const force = document.getElementById('optForceCheckbox').checked;
 
                 try {
-                    const res = await fetch(`api/optimize.php?action=analyze&path=${encodeURIComponent(this.currentPath)}&recursive=${recursive ? '1' : '0'}`);
+                    let res;
+                    if (this._optimizeTargets) {
+                        res = await fetch('api/optimize.php?action=analyze', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ targets: this._optimizeTargets, force: force })
+                        });
+                    } else {
+                        const recursive = document.getElementById('optRecursiveCheckbox').checked;
+                        res = await fetch(`api/optimize.php?action=analyze&path=${encodeURIComponent(this.currentPath)}&recursive=${recursive ? '1' : '0'}&force=${force ? '1' : '0'}`);
+                    }
+
                     if (!res.ok) {
                         const err = await res.json().catch(() => ({}));
-                        throw new Error(err.error || 'Error al analizar la carpeta');
+                        throw new Error(err.error || 'Error al analizar imágenes');
                     }
                     const data = await res.json();
                     this._pendingOptimizeFiles = data.files || [];
@@ -1547,7 +1594,7 @@
                     document.getElementById('optListCounter').textContent = `${this._pendingOptimizeFiles.length} archivos`;
 
                     if (this._pendingOptimizeFiles.length === 0) {
-                        listContainer.innerHTML = `<div class="p-4 text-center text-neutral-400">No se encontraron imágenes optimizables (.webp, .jpg, .jpeg, .png) en esta ubicación.</div>`;
+                        listContainer.innerHTML = `<div class="p-4 text-center text-neutral-400">No se encontraron imágenes pendientes de optimizar. Si deseas reprocesarlas, marca "Reoptimizar de todos modos".</div>`;
                     } else {
                         document.getElementById('optBtnStart').classList.remove('hidden');
                         document.getElementById('optBtnStart').innerHTML = `<i data-feather="zap" class="w-4 h-4"></i> <span>Optimizar ${this._pendingOptimizeFiles.length} imágenes</span>`;
@@ -1559,9 +1606,10 @@
                             const estKb = Math.round(f.estimated_size / 1024);
                             const dim = (f.width && f.height) ? `${f.width}×${f.height}` : '';
                             const ruleDesc = `Regla: ${f.rule.pattern} (max ${f.rule.max_side}px, Q${f.rule.quality})`;
+                            const actionBadge = f.will_convert ? `<span class="bg-blue-100 text-blue-700 text-[9px] font-bold px-1.5 py-0.2 rounded ml-1">→ WebP</span>` : '';
                             row.innerHTML = `
                                 <div class="overflow-hidden mr-3">
-                                    <p class="font-medium text-neutral-800 truncate" title="${f.path}">${f.name}</p>
+                                    <p class="font-medium text-neutral-800 truncate" title="${f.path}">${f.name} ${actionBadge}</p>
                                     <p class="text-[10px] text-neutral-400 truncate">${ruleDesc} ${dim ? '• ' + dim : ''}</p>
                                 </div>
                                 <div class="text-right shrink-0 font-mono text-[11px]">
@@ -1583,16 +1631,24 @@
             async startBatchOptimization() {
                 if (!this._pendingOptimizeFiles || this._pendingOptimizeFiles.length === 0) return;
                 
-                const confirmed = confirm(`¿Estás seguro de optimizar ${this._pendingOptimizeFiles.length} imagen(es)?\n\n• Se mantendrán exactamente las mismas URLs y extensiones.\n• Se guardará copia del original en .originales.\n• Solo se reemplazará si se ahorra al menos un 10%.`);
+                const confirmed = confirm(`¿Estás seguro de optimizar ${this._pendingOptimizeFiles.length} imagen(es)?\n\n• Todo archivo JPG/PNG se convertirá a WebP conservando copia del original en .originales.\n• Las imágenes WebP conservan exactamente el mismo nombre y ruta.\n• Solo se reemplaza si se ahorra espacio.`);
                 if (!confirmed) return;
+
+                this._cancelOptimization = false;
 
                 document.getElementById('optAnalysisState').classList.add('hidden');
                 document.getElementById('optProgressState').classList.remove('hidden');
                 document.getElementById('optBtnStart').classList.add('hidden');
                 document.getElementById('optBtnCancel').classList.add('hidden');
+                
+                const cancelBatchBtn = document.getElementById('optBtnCancelBatch');
+                cancelBatchBtn.classList.remove('hidden');
+                cancelBatchBtn.disabled = false;
+                cancelBatchBtn.textContent = 'Cancelar proceso';
 
                 const total = this._pendingOptimizeFiles.length;
                 const filePaths = this._pendingOptimizeFiles.map(f => f.path);
+                const force = document.getElementById('optForceCheckbox').checked;
                 const batchSize = 10;
                 let completed = 0;
                 let totalSavedBytes = 0;
@@ -1608,14 +1664,18 @@
                 const statusText = document.getElementById('optProgressStatusText');
 
                 for (let i = 0; i < filePaths.length; i += batchSize) {
+                    if (this._cancelOptimization) {
+                        break;
+                    }
+
                     const batch = filePaths.slice(i, i + batchSize);
-                    statusText.textContent = `Procesando ${completed} de ${total} imágenes...`;
+                    statusText.textContent = `Procesando lote: ${completed} de ${total} imágenes...`;
                     
                     try {
                         const res = await fetch('api/optimize.php', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ action: 'optimize', files: batch })
+                            body: JSON.stringify({ action: 'optimize', files: batch, force: force })
                         });
                         
                         if (!res.ok) {
@@ -1627,13 +1687,16 @@
                             completed++;
                             const itemEl = document.createElement('div');
                             itemEl.className = 'p-2 flex items-center justify-between';
-                            const fname = p.path.split('/').pop();
+                            const origName = p.path.split('/').pop();
+                            const finalName = (p.final_path || p.path).split('/').pop();
+                            const nameDisplay = p.converted_to_webp ? `${origName} → <b class="text-blue-700">${finalName}</b>` : `<span class="font-medium text-neutral-800">${origName}</span>`;
+
                             if (p.optimized) {
                                 optimizedCount++;
                                 totalSavedBytes += p.saved_bytes;
                                 itemEl.innerHTML = `
                                     <div class="truncate mr-2">
-                                        <span class="font-medium text-neutral-800">${fname}</span>
+                                        ${nameDisplay}
                                         <span class="text-neutral-400 text-[10px] ml-1">(${Math.round(p.original_size/1024)} KB → ${Math.round(p.new_size/1024)} KB)</span>
                                     </div>
                                     <span class="bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded text-[10px] shrink-0">-${p.saved_percent}%</span>
@@ -1642,8 +1705,8 @@
                                 skippedCount++;
                                 itemEl.innerHTML = `
                                     <div class="truncate mr-2">
-                                        <span class="text-neutral-600">${fname}</span>
-                                        <span class="text-neutral-400 text-[10px] ml-1">(${p.reason || 'Sin reducción'})</span>
+                                        <span class="text-neutral-600">${origName}</span>
+                                        <span class="text-neutral-400 text-[10px] ml-1">(${p.reason || 'Sin cambio'})</span>
                                     </div>
                                     <span class="bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded text-[10px] shrink-0">Sin cambio</span>
                                 `;
@@ -1674,14 +1737,22 @@
                     const pct = Math.round((completed / total) * 100);
                     progressBar.style.width = `${pct}%`;
                     percentText.textContent = `${pct}%`;
+
+                    if (this._cancelOptimization) {
+                        break;
+                    }
                 }
 
                 // Show finished state
+                cancelBatchBtn.classList.add('hidden');
                 document.getElementById('optProgressState').classList.add('hidden');
                 document.getElementById('optFinishedState').classList.remove('hidden');
                 document.getElementById('optBtnClose').classList.remove('hidden');
 
-                const summaryText = `Se optimizaron <b>${optimizedCount}</b> de <b>${total}</b> imágenes, logrando un ahorro real de <b>${this.formatBytes(totalSavedBytes)}</b>. ${skippedCount > 0 ? `(${skippedCount} no requirieron reemplazo por ahorro menor al 10%)` : ''}`;
+                let summaryText = `Se procesaron <b>${completed}</b> de <b>${total}</b> imágenes, logrando optimizar <b>${optimizedCount}</b> con un ahorro real de <b>${this.formatBytes(totalSavedBytes)}</b>. ${skippedCount > 0 ? `(${skippedCount} no requirieron reemplazo)` : ''}`;
+                if (this._cancelOptimization) {
+                    summaryText += ` <br><span class="text-amber-700 font-bold">⚠️ Proceso detenido por el usuario tras finalizar el lote en curso.</span>`;
+                }
                 document.getElementById('optFinishedSummaryText').innerHTML = summaryText;
 
                 const failedContainer = document.getElementById('optFailedListContainer');

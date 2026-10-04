@@ -7,6 +7,8 @@ header('Content-Type: application/json');
 @set_time_limit(300);
 @ini_set('memory_limit', '256M');
 
+ensureOriginalesDir();
+
 $validExts = ['webp', 'jpg', 'jpeg', 'png'];
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -21,118 +23,176 @@ if ($method === 'POST') {
 $action = $_GET['action'] ?? ($body['action'] ?? '');
 
 if ($action === 'analyze') {
-    $folder = $_GET['path'] ?? ($body['path'] ?? '');
-    $folder = trim(str_replace('\\', '/', $folder), '/');
-
-    if (isHiddenPath($folder)) {
-        http_response_code(403);
-        echo json_encode(['error' => 'Acceso denegado a ruta oculta']);
-        exit;
-    }
-
-    $fullFolder = resolveSecurePath($folder === '' ? '' : $folder);
-    if ($fullFolder === false && $folder === '') {
-        $fullFolder = realpath(MEDIA_DIR);
-    }
-
-    if ($fullFolder === false || !is_dir($fullFolder)) {
-        http_response_code(400);
-        echo json_encode(['error' => 'Directorio inválido']);
-        exit;
-    }
-
-    $recursive = isset($_GET['recursive']) ? ($_GET['recursive'] === '1' || $_GET['recursive'] === 'true') : (!empty($body['recursive']));
-
+    $registry = getOptimizedRegistry();
+    $force = isset($_GET['force']) ? ($_GET['force'] === '1' || $_GET['force'] === 'true') : (!empty($body['force']));
     $mediaReal = realpath(MEDIA_DIR);
+    if ($mediaReal === false) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Directorio media no accesible']);
+        exit;
+    }
+
+    $filesToAnalyze = [];
+
+    // Comprobar si se enviaron targets específicos (desde selección múltiple: carpetas e imágenes)
+    $targets = $body['targets'] ?? null;
+    if (is_array($targets) && count($targets) > 0) {
+        foreach ($targets as $tgt) {
+            $rawPath = is_array($tgt) ? ($tgt['path'] ?? '') : (string)$tgt;
+            $safe = validateSafeRelativePath($rawPath);
+            if ($safe === false || isHiddenPath($safe)) continue;
+
+            $fullTgt = resolveSecurePath($safe);
+            if ($fullTgt === false || is_link($fullTgt)) continue;
+
+            if (is_dir($fullTgt)) {
+                // Carpeta seleccionada: escanear recursivamente
+                try {
+                    $dirIt = new RecursiveDirectoryIterator($fullTgt, FilesystemIterator::SKIP_DOTS);
+                    $it = new RecursiveIteratorIterator($dirIt, RecursiveIteratorIterator::SELF_FIRST);
+                    foreach ($it as $item) {
+                        if ($item->isLink() || $item->isDir()) continue;
+                        $realItem = realpath($item->getPathname());
+                        if ($realItem === false || is_link($realItem)) continue;
+                        $sub = substr($realItem, strlen($mediaReal));
+                        $sub = str_replace('\\', '/', ltrim($sub, '/\\'));
+                        if (isHiddenPath($sub) || isHiddenItem($item->getFilename())) continue;
+                        $filesToAnalyze[$sub] = $realItem;
+                    }
+                } catch (Exception $e) {}
+            } else if (file_exists($fullTgt)) {
+                // Archivo seleccionado
+                $sub = substr(realpath($fullTgt), strlen($mediaReal));
+                $sub = str_replace('\\', '/', ltrim($sub, '/\\'));
+                if (!isHiddenPath($sub) && !isHiddenItem(basename($sub))) {
+                    $filesToAnalyze[$sub] = realpath($fullTgt);
+                }
+            }
+        }
+    } else {
+        // Carpeta indicada (comportamiento estándar)
+        $folder = $_GET['path'] ?? ($body['path'] ?? '');
+        $folder = trim(str_replace('\\', '/', (string)$folder), '/');
+
+        if ($folder !== '') {
+            $safeFolder = validateSafeRelativePath($folder);
+            if ($safeFolder === false || isHiddenPath($safeFolder)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Ruta de carpeta inválida o segmentos no permitidos']);
+                exit;
+            }
+            $folder = $safeFolder;
+        }
+
+        $fullFolder = resolveSecurePath($folder === '' ? '' : $folder);
+        if ($fullFolder === false && $folder === '') {
+            $fullFolder = $mediaReal;
+        }
+
+        if ($fullFolder === false || !is_dir($fullFolder)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Directorio inválido']);
+            exit;
+        }
+
+        $recursive = isset($_GET['recursive']) ? ($_GET['recursive'] === '1' || $_GET['recursive'] === 'true') : (!empty($body['recursive']));
+
+        try {
+            if ($recursive) {
+                $dirIterator = new RecursiveDirectoryIterator($fullFolder, FilesystemIterator::SKIP_DOTS);
+                $iterator = new RecursiveIteratorIterator($dirIterator, RecursiveIteratorIterator::SELF_FIRST);
+            } else {
+                $iterator = new FilesystemIterator($fullFolder, FilesystemIterator::SKIP_DOTS);
+            }
+
+            foreach ($iterator as $item) {
+                if ($item->isLink() || $item->isDir()) continue;
+                $itemReal = realpath($item->getPathname());
+                if ($itemReal === false || is_link($itemReal)) continue;
+
+                $subPath = substr($itemReal, strlen($mediaReal));
+                $subPath = str_replace('\\', '/', ltrim($subPath, '/\\'));
+
+                if (isHiddenPath($subPath) || isHiddenItem($item->getFilename())) continue;
+                $filesToAnalyze[$subPath] = $itemReal;
+            }
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Error al analizar la carpeta: ' . $e->getMessage()]);
+            exit;
+        }
+    }
+
     $files = [];
     $totalImages = 0;
     $totalSize = 0;
     $estimatedTotalSize = 0;
 
-    try {
-        if ($recursive) {
-            $dirIterator = new RecursiveDirectoryIterator($fullFolder, FilesystemIterator::SKIP_DOTS);
-            $iterator = new RecursiveIteratorIterator($dirIterator, RecursiveIteratorIterator::SELF_FIRST);
-        } else {
-            $iterator = new FilesystemIterator($fullFolder, FilesystemIterator::SKIP_DOTS);
+    foreach ($filesToAnalyze as $subPath => $itemReal) {
+        $filename = basename($itemReal);
+        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        if (!in_array($ext, $validExts, true)) continue;
+
+        $rule = getOptimizeRuleForPath($subPath);
+        $size = filesize($itemReal);
+
+        $width = 0;
+        $height = 0;
+        $imgInfo = @getimagesize($itemReal);
+        if ($imgInfo && isset($imgInfo[0], $imgInfo[1])) {
+            $width = (int)$imgInfo[0];
+            $height = (int)$imgInfo[1];
         }
 
-        foreach ($iterator as $item) {
-            if ($item->isLink()) continue; // NO seguir enlaces simbólicos
-            if ($item->isDir()) continue;
-
-            $itemPath = $item->getPathname();
-            $itemReal = realpath($itemPath);
-            if ($itemReal === false || is_link($itemReal)) continue;
-
-            // Ruta relativa a MEDIA_DIR
-            $subPath = substr($itemReal, strlen($mediaReal));
-            $subPath = str_replace('\\', '/', ltrim($subPath, '/\\'));
-
-            if (isHiddenPath($subPath)) continue;
-            $filename = $item->getFilename();
-            if (isHiddenItem($filename)) continue;
-
-            $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-            if (!in_array($ext, $validExts, true)) continue;
-
-            $size = $item->getSize();
-            $rule = getOptimizeRuleForPath($subPath);
-
-            $width = 0;
-            $height = 0;
-            $imgInfo = @getimagesize($itemReal);
-            if ($imgInfo && isset($imgInfo[0], $imgInfo[1])) {
-                $width = (int)$imgInfo[0];
-                $height = (int)$imgInfo[1];
-            }
-
-            // Estimar peso optimizado según redimensión y calidad
-            $maxSide = max($width, $height);
-            $newWidth = $width;
-            $newHeight = $height;
-            if ($maxSide > $rule['max_side'] && $maxSide > 0) {
-                $ratio = $rule['max_side'] / $maxSide;
-                $newWidth = (int)round($width * $ratio);
-                $newHeight = (int)round($height * $ratio);
-            }
-
-            $pixelRatio = ($width > 0 && $height > 0) ? ($newWidth * $newHeight) / ($width * $height) : 1.0;
-            $qualityFactor = $rule['quality'] / 85.0;
-            $estFactor = min(0.95, $pixelRatio * $qualityFactor);
-            $estSize = (int)round($size * $estFactor);
-            if ($estSize >= $size) {
-                $estSize = (int)round($size * 0.90);
-            }
-            if ($estSize <= 0) $estSize = 1;
-
-            $hasBackup = file_exists(MEDIA_DIR . '/.originales/' . $subPath);
-
-            $files[] = [
-                'path' => $subPath,
-                'name' => $filename,
-                'size' => $size,
-                'width' => $width,
-                'height' => $height,
-                'rule' => $rule,
-                'estimated_size' => $estSize,
-                'has_backup' => $hasBackup
-            ];
-
-            $totalImages++;
-            $totalSize += $size;
-            $estimatedTotalSize += $estSize;
+        $isPending = isImagePendingOptimization($subPath, $itemReal, $rule, $registry, $width, $height);
+        if (!$isPending && !$force) {
+            continue; // Se salta si ya está optimizada con la misma regla, salvo que force sea true
         }
-    } catch (Exception $e) {
-        http_response_code(500);
-        echo json_encode(['error' => 'Error al analizar la carpeta: ' . $e->getMessage()]);
-        exit;
+
+        // Estimar nuevo peso
+        $maxSide = max($width, $height);
+        $newWidth = $width;
+        $newHeight = $height;
+        if ($maxSide > $rule['max_side'] && $maxSide > 0) {
+            $ratio = $rule['max_side'] / $maxSide;
+            $newWidth = (int)round($width * $ratio);
+            $newHeight = (int)round($height * $ratio);
+        }
+
+        $pixelRatio = ($width > 0 && $height > 0) ? ($newWidth * $newHeight) / ($width * $height) : 1.0;
+        $qualityFactor = $rule['quality'] / 85.0;
+        // Si es JPG o PNG se convertirá a WebP, lo cual produce un ahorro adicional notable
+        $formatFactor = ($ext !== 'webp') ? 0.65 : 0.85;
+        $estFactor = min(0.90, $pixelRatio * $qualityFactor * $formatFactor);
+        $estSize = (int)round($size * $estFactor);
+        if ($estSize >= $size) {
+            $estSize = (int)round($size * 0.90);
+        }
+        if ($estSize <= 0) $estSize = 1;
+
+        $hasBackup = file_exists(MEDIA_DIR . '/.originales/' . $subPath);
+
+        $files[] = [
+            'path' => $subPath,
+            'name' => $filename,
+            'size' => $size,
+            'width' => $width,
+            'height' => $height,
+            'rule' => $rule,
+            'is_pending' => $isPending,
+            'will_convert' => ($ext !== 'webp'),
+            'estimated_size' => $estSize,
+            'has_backup' => $hasBackup
+        ];
+
+        $totalImages++;
+        $totalSize += $size;
+        $estimatedTotalSize += $estSize;
     }
 
     echo json_encode([
         'success' => true,
-        'folder' => $folder,
-        'recursive' => $recursive,
+        'force' => $force,
         'total_images' => $totalImages,
         'total_size' => $totalSize,
         'estimated_total_size' => $estimatedTotalSize,
@@ -155,6 +215,9 @@ if ($action === 'analyze') {
         exit;
     }
 
+    $force = !empty($body['force']);
+    $registry = getOptimizedRegistry();
+
     // Lote de máximo 10 rutas
     $filePaths = array_slice($filePaths, 0, 10);
     $results = [];
@@ -163,10 +226,13 @@ if ($action === 'analyze') {
     foreach ($filePaths as $relPath) {
         $tmpFile = null;
         try {
-            $relPath = str_replace('\\', '/', ltrim($relPath, '/'));
-            if (empty($relPath) || isHiddenPath($relPath)) {
-                throw new Exception('Ruta oculta o inválida');
+            // Rechaza con 400 rutas con segmentos ".." o "."
+            $safeRelPath = validateSafeRelativePath($relPath);
+            if ($safeRelPath === false || isHiddenPath($safeRelPath)) {
+                http_response_code(400);
+                throw new Exception('Ruta no válida o contiene segmentos no permitidos (".." o ".")');
             }
+            $relPath = $safeRelPath;
 
             $fullPath = resolveSecurePath($relPath);
             if ($fullPath === false || !file_exists($fullPath) || is_dir($fullPath) || is_link($fullPath)) {
@@ -175,7 +241,7 @@ if ($action === 'analyze') {
 
             $ext = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
             if (!in_array($ext, $validExts, true)) {
-                throw new Exception('Formato no soportado para optimización');
+                throw new Exception('Formato no soportado para optimización (nunca se procesan .gif ni otros)');
             }
 
             $rule = getOptimizeRuleForPath($relPath);
@@ -215,41 +281,31 @@ if ($action === 'analyze') {
             $destImage = imagecreatetruecolor($newWidth, $newHeight);
 
             // Preservar canal alfa (transparencia) para PNG y WebP
-            if ($ext === 'png' || $ext === 'webp') {
-                imagealphablending($destImage, false);
-                imagesavealpha($destImage, true);
-                $trans = imagecolorallocatealpha($destImage, 255, 255, 255, 127);
-                imagefilledrectangle($destImage, 0, 0, $newWidth, $newHeight, $trans);
-            }
+            imagealphablending($destImage, false);
+            imagesavealpha($destImage, true);
+            $trans = imagecolorallocatealpha($destImage, 255, 255, 255, 127);
+            imagefilledrectangle($destImage, 0, 0, $newWidth, $newHeight, $trans);
 
             imagecopyresampled($destImage, $sourceImage, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
 
-            $tmpFile = tempnam(dirname($fullPath), 'opt_');
-            $encoded = false;
-
-            // Conservar el MISMO formato y extensión
-            if ($ext === 'webp') {
-                $encoded = imagewebp($destImage, $tmpFile, $quality);
-            } elseif ($ext === 'jpg' || $ext === 'jpeg') {
-                $encoded = imagejpeg($destImage, $tmpFile, $quality);
-            } elseif ($ext === 'png') {
-                $encoded = imagepng($destImage, $tmpFile, 9);
-            }
+            // Archivo temporal oculto en la MISMA carpeta para reemplazo atómico con rename()
+            $tmpFile = dirname($fullPath) . '/.opt_' . uniqid() . '.webp';
+            $encoded = imagewebp($destImage, $tmpFile, $quality);
 
             imagedestroy($sourceImage);
             imagedestroy($destImage);
 
             if (!$encoded || !file_exists($tmpFile)) {
                 if ($tmpFile && file_exists($tmpFile)) @unlink($tmpFile);
-                throw new Exception('Error al codificar imagen optimizada');
+                throw new Exception('Error al codificar imagen a WebP');
             }
 
             $oldSize = filesize($fullPath);
             $newSize = filesize($tmpFile);
-            $threshold = $oldSize * 0.90; // Debe pesar al menos 10% menos
 
-            if ($newSize <= $threshold) {
-                // Copiar original a MEDIA_DIR/.originales/<misma ruta> (si no existe ya)
+            if ($ext !== 'webp') {
+                // CASO 1: JPG / JPEG / PNG -> SIEMPRE se convierte a WebP
+                // 1) Copiar original a .originales/<relPath>
                 $backupPath = MEDIA_DIR . '/.originales/' . $relPath;
                 $backupDir = dirname($backupPath);
                 if (!is_dir($backupDir)) {
@@ -262,19 +318,51 @@ if ($action === 'analyze') {
                     }
                 }
 
-                // Reemplazar la imagen conservando nombre, extensión y ruta
-                if (!copy($tmpFile, $fullPath)) {
-                    @unlink($tmpFile);
-                    throw new Exception('No se pudo reemplazar el archivo original');
+                // 2) Determinar nombre final .webp (con sufijos -1, -2 si ya existe)
+                $baseName = pathinfo($fullPath, PATHINFO_FILENAME);
+                $parentDir = dirname($fullPath);
+                $destFileName = $baseName . '.webp';
+                $destFilePath = $parentDir . '/' . $destFileName;
+                $counter = 1;
+                while (file_exists($destFilePath)) {
+                    $destFileName = $baseName . '-' . $counter . '.webp';
+                    $destFilePath = $parentDir . '/' . $destFileName;
+                    $counter++;
                 }
-                @unlink($tmpFile);
 
-                $savedBytes = $oldSize - $newSize;
-                $savedPercent = round(($savedBytes / $oldSize) * 100, 1);
+                // 3) Reemplazo atómico con rename()
+                if (!@rename($tmpFile, $destFilePath)) {
+                    @unlink($tmpFile);
+                    throw new Exception('No se pudo mover el archivo temporal a su destino final');
+                }
+
+                // 4) Borrar el archivo original
+                @unlink($fullPath);
+
+                $destRelDir = dirname($relPath);
+                $destRelDir = ($destRelDir === '.' || $destRelDir === '/') ? '' : $destRelDir;
+                $finalRelPath = $destRelDir === '' ? $destFileName : $destRelDir . '/' . $destFileName;
+
+                $savedBytes = max(0, $oldSize - $newSize);
+                $savedPercent = $oldSize > 0 ? round(($savedBytes / $oldSize) * 100, 1) : 0;
+
+                // Registrar en .optimizadas.json
+                updateOptimizedRegistryEntry($finalRelPath, [
+                    'fecha' => date('c'),
+                    'regla' => $rule,
+                    'peso_antes' => $oldSize,
+                    'peso_despues' => $newSize,
+                    'original_convertido' => $relPath
+                ]);
+                if ($finalRelPath !== $relPath) {
+                    removeOptimizedRegistryEntry($relPath);
+                }
 
                 $results[] = [
                     'path' => $relPath,
+                    'final_path' => $finalRelPath,
                     'optimized' => true,
+                    'converted_to_webp' => true,
                     'original_size' => $oldSize,
                     'new_size' => $newSize,
                     'saved_bytes' => $savedBytes,
@@ -283,19 +371,103 @@ if ($action === 'analyze') {
                     'height' => $newHeight,
                     'rule' => $rule
                 ];
+
             } else {
-                @unlink($tmpFile);
-                $results[] = [
-                    'path' => $relPath,
-                    'optimized' => false,
-                    'reason' => 'Ahorro menor al 10%',
-                    'original_size' => $oldSize,
-                    'new_size' => $newSize,
-                    'width' => $width,
-                    'height' => $height,
-                    'rule' => $rule
-                ];
+                // CASO 2: WEBP -> Optimizar conservando nombre y ruta
+                $threshold = $oldSize * 0.90; // Debe pesar al menos 10% menos o requerir redimensionamiento
+                $needsResize = ($maxSide > $maxSideLimit);
+
+                if ($newSize <= $threshold || $needsResize || $force) {
+                    // Si el nuevo tamaño es menor, aplicamos el reemplazo
+                    if ($newSize < $oldSize || $needsResize) {
+                        $backupPath = MEDIA_DIR . '/.originales/' . $relPath;
+                        $backupDir = dirname($backupPath);
+                        if (!is_dir($backupDir)) {
+                            @mkdir($backupDir, 0755, true);
+                        }
+                        if (!file_exists($backupPath)) {
+                            if (!copy($fullPath, $backupPath)) {
+                                @unlink($tmpFile);
+                                throw new Exception('No se pudo respaldar original en .originales');
+                            }
+                        }
+
+                        // Reemplazo atómico con rename()
+                        if (!@rename($tmpFile, $fullPath)) {
+                            @unlink($tmpFile);
+                            throw new Exception('No se pudo reemplazar el archivo con rename()');
+                        }
+
+                        $savedBytes = max(0, $oldSize - $newSize);
+                        $savedPercent = $oldSize > 0 ? round(($savedBytes / $oldSize) * 100, 1) : 0;
+
+                        updateOptimizedRegistryEntry($relPath, [
+                            'fecha' => date('c'),
+                            'regla' => $rule,
+                            'peso_antes' => $oldSize,
+                            'peso_despues' => $newSize
+                        ]);
+
+                        $results[] = [
+                            'path' => $relPath,
+                            'final_path' => $relPath,
+                            'optimized' => true,
+                            'converted_to_webp' => false,
+                            'original_size' => $oldSize,
+                            'new_size' => $newSize,
+                            'saved_bytes' => $savedBytes,
+                            'saved_percent' => $savedPercent,
+                            'width' => $newWidth,
+                            'height' => $newHeight,
+                            'rule' => $rule
+                        ];
+                    } else {
+                        // El nuevo archivo pesaba más o igual, no conviene reemplazar
+                        @unlink($tmpFile);
+                        updateOptimizedRegistryEntry($relPath, [
+                            'fecha' => date('c'),
+                            'regla' => $rule,
+                            'peso_antes' => $oldSize,
+                            'peso_despues' => $oldSize,
+                            'skipped' => true
+                        ]);
+
+                        $results[] = [
+                            'path' => $relPath,
+                            'final_path' => $relPath,
+                            'optimized' => false,
+                            'reason' => 'Sin reducción de peso',
+                            'original_size' => $oldSize,
+                            'new_size' => $oldSize,
+                            'width' => $width,
+                            'height' => $height,
+                            'rule' => $rule
+                        ];
+                    }
+                } else {
+                    @unlink($tmpFile);
+                    updateOptimizedRegistryEntry($relPath, [
+                        'fecha' => date('c'),
+                        'regla' => $rule,
+                        'peso_antes' => $oldSize,
+                        'peso_despues' => $oldSize,
+                        'skipped' => true
+                    ]);
+
+                    $results[] = [
+                        'path' => $relPath,
+                        'final_path' => $relPath,
+                        'optimized' => false,
+                        'reason' => 'Ahorro menor al 10%',
+                        'original_size' => $oldSize,
+                        'new_size' => $oldSize,
+                        'width' => $width,
+                        'height' => $height,
+                        'rule' => $rule
+                    ];
+                }
             }
+
         } catch (Throwable $e) {
             if ($tmpFile && file_exists($tmpFile)) {
                 @unlink($tmpFile);
@@ -321,19 +493,20 @@ if ($action === 'analyze') {
         exit;
     }
 
-    $relPath = $body['path'] ?? ($_GET['path'] ?? '');
-    $relPath = str_replace('\\', '/', ltrim($relPath, '/'));
-
-    if (empty($relPath) || isHiddenPath($relPath)) {
+    $rawPath = $body['path'] ?? ($_GET['path'] ?? '');
+    // Rechaza con 400 rutas con segmentos ".." o "."
+    $safeRelPath = validateSafeRelativePath($rawPath);
+    if ($safeRelPath === false || isHiddenPath($safeRelPath)) {
         http_response_code(400);
-        echo json_encode(['error' => 'Ruta de archivo inválida']);
+        echo json_encode(['error' => 'Ruta no válida o contiene segmentos no permitidos (".." o ".")']);
         exit;
     }
+    $relPath = $safeRelPath;
 
     $backupPath = MEDIA_DIR . '/.originales/' . $relPath;
     if (!file_exists($backupPath)) {
         http_response_code(404);
-        echo json_encode(['error' => 'No existe copia original en .originales para este archivo']);
+        echo json_encode(['error' => 'No existe copia en .originales para este archivo']);
         exit;
     }
 
@@ -348,17 +521,23 @@ if ($action === 'analyze') {
         exit;
     }
 
+    $parentDir = dirname($fullDest);
+    if (!is_dir($parentDir)) {
+        @mkdir($parentDir, 0755, true);
+    }
+
     if (copy($backupPath, $fullDest)) {
         @unlink($backupPath);
+        removeOptimizedRegistryEntry($relPath);
 
         // Limpiar carpetas vacías en .originales
-        $parentDir = dirname($backupPath);
+        $parentBackup = dirname($backupPath);
         $rootBackup = realpath(MEDIA_DIR . '/.originales');
-        while ($parentDir && $rootBackup && $parentDir !== $rootBackup && is_dir($parentDir)) {
-            $contents = array_diff(scandir($parentDir), ['.', '..']);
+        while ($parentBackup && $rootBackup && $parentBackup !== $rootBackup && is_dir($parentBackup)) {
+            $contents = array_diff(scandir($parentBackup), ['.', '..']);
             if (empty($contents)) {
-                @rmdir($parentDir);
-                $parentDir = dirname($parentDir);
+                @rmdir($parentBackup);
+                $parentBackup = dirname($parentBackup);
             } else {
                 break;
             }

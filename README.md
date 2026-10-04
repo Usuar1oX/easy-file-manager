@@ -20,11 +20,16 @@ Un gestor de archivos e imágenes minimalista, rápido y moderno en un solo arch
 ## Características
 - Compresión automática a WebP con calidad configurable (`webp_quality`).
 - Redimensionamiento proporcional por el lado mayor (horizontal y vertical).
-- Herramienta **Optimizar imágenes**: analiza y optimiza por lotes las imágenes de una carpeta (y opcionalmente subcarpetas), conservando exactamente el mismo nombre, extensión y ruta para no romper enlaces existentes. Guarda una copia del original en `.originales` y solo reemplaza si se ahorra al menos un 10%.
-- Botón **Restaurar original** en el visor de cada imagen que haya sido optimizada.
+- Herramienta **Optimizar imágenes** unificada:
+  - Convierte automáticamente imágenes `.jpg`/`.jpeg`/`.png` a formato WebP conservando una copia del original en `.originales`.
+  - Optimiza imágenes `.webp` existentes según las reglas `optimize_rules` aplicables por patrón de nombre o ruta.
+  - Registro atómico concurrente en `MEDIA_DIR/.originales/.optimizadas.json` (evita dobles optimizaciones innecesarias).
+  - Indicador visual **"Sin optimizar"** en miniaturas y contador de pendientes en la barra superior.
+  - Soporte para **"Optimizar selección"** (carpetas e imágenes por lotes de 10) con progreso en vivo y botón de cancelación segura.
+- Botón **Restaurar original** en el visor y menú contextual de cada imagen optimizada.
 - Visualización de peso en KB y dimensiones en cada imagen, con indicador destacado en naranja para imágenes superiores a 300 KB.
 - Drag and drop (arrastrar y soltar).
-- Bulk actions (seleccionar varios para borrar, mover o copiar enlace).
+- Bulk actions (seleccionar varios para borrar, mover, optimizar o copiar enlace).
 - Navegación rápida sin recargas.
 - Autenticación segura.
 

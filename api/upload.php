@@ -266,6 +266,15 @@ if ($isImage) {
 
 if ($success) {
     $relativePath = $relativeDirPath === '' ? $finalName : $relativeDirPath . '/' . $finalName;
+    if ($isImage) {
+        $finalSize = file_exists($finalPath) ? filesize($finalPath) : 0;
+        updateOptimizedRegistryEntry($relativePath, [
+            'fecha' => date('c'),
+            'regla' => $rule,
+            'peso_antes' => $file['size'] ?? 0,
+            'peso_despues' => $finalSize
+        ]);
+    }
     $filePayload = [
         'name' => $finalName,
         'path' => $relativePath,

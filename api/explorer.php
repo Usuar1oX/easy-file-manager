@@ -62,6 +62,7 @@ if ($method === 'GET') {
         exit;
     }
 
+    $registry = getOptimizedRegistry();
     $searchQuery = isset($_GET['search']) ? trim($_GET['search']) : '';
     
     if ($searchQuery !== '') {
@@ -118,7 +119,8 @@ if ($method === 'GET') {
                                 $fileData['width'] = $imgInfo[0];
                                 $fileData['height'] = $imgInfo[1];
                             }
-                            $fileData['is_optimized'] = file_exists(MEDIA_DIR . '/.originales/' . $subPath);
+                            $fileData['is_optimized'] = file_exists(MEDIA_DIR . '/.originales/' . $subPath) || isset($registry[$subPath]);
+                            $fileData['is_pending_optimize'] = isImagePendingOptimization($subPath, $fullPath, null, $registry, $fileData['width'] ?? 0, $fileData['height'] ?? 0);
                         }
                         $files[] = $fileData;
                     }
@@ -180,7 +182,8 @@ if ($method === 'GET') {
                     $fileData['width'] = $imgInfo[0];
                     $fileData['height'] = $imgInfo[1];
                 }
-                $fileData['is_optimized'] = file_exists(MEDIA_DIR . '/.originales/' . $relativePath);
+                $fileData['is_optimized'] = file_exists(MEDIA_DIR . '/.originales/' . $relativePath) || isset($registry[$relativePath]);
+                $fileData['is_pending_optimize'] = isImagePendingOptimization($relativePath, $itemPath, null, $registry, $fileData['width'] ?? 0, $fileData['height'] ?? 0);
             }
             $files[] = $fileData;
         }
@@ -255,6 +258,7 @@ if ($method === 'GET') {
     }
     
     if ($success) {
+        removeOptimizedRegistryEntry($pathParam);
         echo json_encode(['success' => true]);
     } else {
         http_response_code(500);
@@ -313,6 +317,7 @@ if ($method === 'GET') {
     }
     
     if (rename($targetPath, $newPath)) {
+        renameOptimizedRegistryEntry($pathParam, $intendedNewPath);
         echo json_encode(['success' => true]);
     } else {
         http_response_code(500);
@@ -384,92 +389,21 @@ if ($method === 'GET') {
     $success = false;
     if ($action === 'cut') {
         $success = rename($fullSourcePath, $fullTargetPath);
+        if ($success) {
+            $mediaReal = realpath(MEDIA_DIR);
+            $targetReal = realpath($fullTargetPath);
+            if ($mediaReal && $targetReal) {
+                $newRel = substr($targetReal, strlen($mediaReal));
+                $newRel = str_replace('\\', '/', ltrim($newRel, '/\\'));
+                renameOptimizedRegistryEntry($sourcePath, $newRel);
+            }
+        }
     } else if ($action === 'copy') {
         if (is_dir($fullSourcePath)) {
             copyDir($fullSourcePath, $fullTargetPath);
             $success = true;
         } else {
             $success = copy($fullSourcePath, $fullTargetPath);
-        }
-    } else if ($action === 'convert_webp') {
-        if (!file_exists($fullSourcePath) || is_dir($fullSourcePath)) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Source file not found or is a directory']);
-            exit;
-        }
-        
-        $mimeType = mime_content_type($fullSourcePath);
-        $isImage = in_array($mimeType, ['image/jpeg', 'image/png']);
-        
-        if (!$isImage) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Not a valid image for conversion']);
-            exit;
-        }
-        
-        $sourceImage = null;
-        if ($mimeType === 'image/jpeg') {
-            $sourceImage = @imagecreatefromjpeg($fullSourcePath);
-        } elseif ($mimeType === 'image/png') {
-            $sourceImage = @imagecreatefrompng($fullSourcePath);
-        }
-        
-        if ($sourceImage) {
-            $width = imagesx($sourceImage);
-            $height = imagesy($sourceImage);
-            $newWidth = $width;
-            $newHeight = $height;
-
-            $fileSize = filesize($fullSourcePath);
-            $maxSide = max($width, $height);
-            if ($fileSize > RESIZE_THRESHOLD || $maxSide > MAX_WIDTH) {
-                if ($maxSide > MAX_WIDTH) {
-                    if ($width >= $height) {
-                        $newWidth = MAX_WIDTH;
-                        $newHeight = (int)round($height * (MAX_WIDTH / $width));
-                    } else {
-                        $newHeight = MAX_WIDTH;
-                        $newWidth = (int)round($width * (MAX_WIDTH / $height));
-                    }
-                }
-            }
-
-            $destinationImage = imagecreatetruecolor($newWidth, $newHeight);
-
-            imagealphablending($destinationImage, false);
-            imagesavealpha($destinationImage, true);
-            $transparent = imagecolorallocatealpha($destinationImage, 255, 255, 255, 127);
-            imagefilledrectangle($destinationImage, 0, 0, $newWidth, $newHeight, $transparent);
-
-            imagecopyresampled(
-                $destinationImage, $sourceImage,
-                0, 0, 0, 0,
-                $newWidth, $newHeight,
-                $width, $height
-            );
-
-            $info = pathinfo(basename($fullSourcePath));
-            $finalName = $info['filename'] . '.webp';
-            $finalPath = dirname($fullSourcePath) . '/' . $finalName;
-
-            $success = imagewebp($destinationImage, $finalPath, WEBP_QUALITY);
-
-            imagedestroy($sourceImage);
-            imagedestroy($destinationImage);
-            
-            if ($success) {
-                unlink($fullSourcePath); // Borrar el original
-                echo json_encode(['success' => true]);
-                exit;
-            } else {
-                http_response_code(500);
-                echo json_encode(['error' => 'Failed to convert image']);
-                exit;
-            }
-        } else {
-            http_response_code(500);
-            echo json_encode(['error' => 'Error reading the original image']);
-            exit;
         }
     } else {
         http_response_code(400);

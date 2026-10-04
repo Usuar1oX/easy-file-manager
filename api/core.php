@@ -141,3 +141,279 @@ function sanitizeName($name) {
     }
     return $name;
 }
+
+function ensureOriginalesDir() {
+    $origDir = MEDIA_DIR . '/.originales';
+    if (!is_dir($origDir)) {
+        @mkdir($origDir, 0755, true);
+    }
+    $htaccess = $origDir . '/.htaccess';
+    if (!file_exists($htaccess)) {
+        @file_put_contents($htaccess, "Require all denied\n");
+    }
+    return $origDir;
+}
+
+function validateSafeRelativePath($path) {
+    $norm = str_replace('\\', '/', trim((string)$path, "/ \t\n\r\0\x0B"));
+    if ($norm === '') return false;
+    $segments = explode('/', $norm);
+    foreach ($segments as $seg) {
+        if ($seg === '.' || $seg === '..') {
+            return false;
+        }
+    }
+    return $norm;
+}
+
+function saveOptimizedRegistry($registry) {
+    ensureOriginalesDir();
+    $regFile = MEDIA_DIR . '/.originales/.optimizadas.json';
+    $fp = @fopen($regFile, 'c+');
+    if (!$fp) return false;
+    if (flock($fp, LOCK_EX)) {
+        ftruncate($fp, 0);
+        rewind($fp);
+        $json = json_encode($registry, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        fwrite($fp, $json);
+        fflush($fp);
+        flock($fp, LOCK_UN);
+        fclose($fp);
+        return true;
+    }
+    fclose($fp);
+    return false;
+}
+
+function getOptimizedRegistry() {
+    ensureOriginalesDir();
+    $regFile = MEDIA_DIR . '/.originales/.optimizadas.json';
+    
+    // Si no existe, crear registro inicial con las imágenes que ya tengan copia en .originales
+    if (!file_exists($regFile)) {
+        $registry = [];
+        $origReal = realpath(MEDIA_DIR . '/.originales');
+        if ($origReal && is_dir($origReal)) {
+            try {
+                $dirIt = new RecursiveDirectoryIterator($origReal, FilesystemIterator::SKIP_DOTS);
+                $it = new RecursiveIteratorIterator($dirIt, RecursiveIteratorIterator::SELF_FIRST);
+                foreach ($it as $item) {
+                    if ($item->isDir() || $item->isLink()) continue;
+                    $filename = $item->getFilename();
+                    if ($filename === '.htaccess' || $filename === '.optimizadas.json') continue;
+                    $itemReal = realpath($item->getPathname());
+                    if (!$itemReal) continue;
+                    $subPath = substr($itemReal, strlen($origReal));
+                    $subPath = str_replace('\\', '/', ltrim($subPath, '/\\'));
+                    
+                    $targetPath = $subPath;
+                    if (!file_exists(MEDIA_DIR . '/' . $targetPath)) {
+                        $webpCandidate = preg_replace('/\.(jpg|jpeg|png)$/i', '.webp', $subPath);
+                        if (file_exists(MEDIA_DIR . '/' . $webpCandidate)) {
+                            $targetPath = $webpCandidate;
+                        }
+                    }
+                    $rule = getOptimizeRuleForPath($targetPath);
+                    $mediaFile = MEDIA_DIR . '/' . $targetPath;
+                    $sizeAfter = file_exists($mediaFile) ? filesize($mediaFile) : 0;
+                    $registry[$targetPath] = [
+                        'fecha' => date('c', filemtime($itemReal)),
+                        'regla' => $rule,
+                        'peso_antes' => filesize($itemReal),
+                        'peso_despues' => $sizeAfter
+                    ];
+                }
+            } catch (Exception $e) {}
+        }
+        saveOptimizedRegistry($registry);
+        return $registry;
+    }
+
+    $fp = @fopen($regFile, 'r');
+    if (!$fp) return [];
+    if (flock($fp, LOCK_SH)) {
+        $content = stream_get_contents($fp);
+        flock($fp, LOCK_UN);
+        fclose($fp);
+        $data = json_decode($content, true);
+        return is_array($data) ? $data : [];
+    }
+    fclose($fp);
+    return [];
+}
+
+function updateOptimizedRegistryEntry($relativePath, $entryData) {
+    ensureOriginalesDir();
+    $regFile = MEDIA_DIR . '/.originales/.optimizadas.json';
+    $norm = str_replace('\\', '/', ltrim($relativePath, '/'));
+    $fp = @fopen($regFile, 'c+');
+    if (!$fp) return false;
+    if (flock($fp, LOCK_EX)) {
+        $content = stream_get_contents($fp);
+        $registry = $content ? (json_decode($content, true) ?: []) : [];
+        $registry[$norm] = $entryData;
+        ftruncate($fp, 0);
+        rewind($fp);
+        $json = json_encode($registry, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        fwrite($fp, $json);
+        fflush($fp);
+        flock($fp, LOCK_UN);
+        fclose($fp);
+        return true;
+    }
+    fclose($fp);
+    return false;
+}
+
+function renameOptimizedRegistryEntry($oldRelPath, $newRelPath) {
+    ensureOriginalesDir();
+    $regFile = MEDIA_DIR . '/.originales/.optimizadas.json';
+    $oldNorm = str_replace('\\', '/', trim($oldRelPath, '/'));
+    $newNorm = str_replace('\\', '/', trim($newRelPath, '/'));
+    if ($oldNorm === '' || $newNorm === '') return false;
+
+    // Si existe copia física en .originales, mover/renombrar también
+    $oldOrig = MEDIA_DIR . '/.originales/' . $oldNorm;
+    $newOrig = MEDIA_DIR . '/.originales/' . $newNorm;
+    if (file_exists($oldOrig)) {
+        $parentNew = dirname($newOrig);
+        if (!is_dir($parentNew)) {
+            @mkdir($parentNew, 0755, true);
+        }
+        @rename($oldOrig, $newOrig);
+    }
+
+    $fp = @fopen($regFile, 'c+');
+    if (!$fp) return false;
+    if (flock($fp, LOCK_EX)) {
+        $content = stream_get_contents($fp);
+        $registry = $content ? (json_decode($content, true) ?: []) : [];
+        $changed = false;
+        
+        if (isset($registry[$oldNorm])) {
+            $registry[$newNorm] = $registry[$oldNorm];
+            unset($registry[$oldNorm]);
+            $changed = true;
+        }
+
+        $oldPrefix = $oldNorm . '/';
+        $newPrefix = $newNorm . '/';
+        $prefixLen = strlen($oldPrefix);
+        foreach ($registry as $k => $v) {
+            if (strpos($k, $oldPrefix) === 0) {
+                $subKey = substr($k, $prefixLen);
+                $registry[$newPrefix . $subKey] = $v;
+                unset($registry[$k]);
+                $changed = true;
+            }
+        }
+
+        if ($changed) {
+            ftruncate($fp, 0);
+            rewind($fp);
+            $json = json_encode($registry, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            fwrite($fp, $json);
+            fflush($fp);
+        }
+        flock($fp, LOCK_UN);
+        fclose($fp);
+        return true;
+    }
+    fclose($fp);
+    return false;
+}
+
+function removeOptimizedRegistryEntry($relPath) {
+    ensureOriginalesDir();
+    $regFile = MEDIA_DIR . '/.originales/.optimizadas.json';
+    $norm = str_replace('\\', '/', trim($relPath, '/'));
+    if ($norm === '') return false;
+
+    $fp = @fopen($regFile, 'c+');
+    if (!$fp) return false;
+    if (flock($fp, LOCK_EX)) {
+        $content = stream_get_contents($fp);
+        $registry = $content ? (json_decode($content, true) ?: []) : [];
+        $changed = false;
+        
+        if (isset($registry[$norm])) {
+            unset($registry[$norm]);
+            $changed = true;
+        }
+
+        $prefix = $norm . '/';
+        foreach ($registry as $k => $v) {
+            if (strpos($k, $prefix) === 0) {
+                unset($registry[$k]);
+                $changed = true;
+            }
+        }
+
+        if ($changed) {
+            ftruncate($fp, 0);
+            rewind($fp);
+            $json = json_encode($registry, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            fwrite($fp, $json);
+            fflush($fp);
+        }
+        flock($fp, LOCK_UN);
+        fclose($fp);
+        return true;
+    }
+    fclose($fp);
+    return false;
+}
+
+function isImagePendingOptimization($relPath, $fullPath = null, $rule = null, $registry = null, $imgWidth = 0, $imgHeight = 0) {
+    $ext = strtolower(pathinfo($relPath, PATHINFO_EXTENSION));
+    if (!in_array($ext, ['webp', 'jpg', 'jpeg', 'png'], true)) {
+        return false;
+    }
+    // 1) Todo .jpg/.jpeg/.png siempre está pendiente (para convertirse a WebP)
+    if (in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
+        return true;
+    }
+
+    if ($rule === null) {
+        $rule = getOptimizeRuleForPath($relPath);
+    }
+    $maxSideLimit = (int)($rule['max_side'] ?? 1024);
+    $qualityTarget = (int)($rule['quality'] ?? 70);
+
+    // 2) Si su lado mayor > max_side de su regla -> pendiente
+    if ($imgWidth <= 0 || $imgHeight <= 0) {
+        if ($fullPath && file_exists($fullPath)) {
+            $info = @getimagesize($fullPath);
+            if ($info && isset($info[0], $info[1])) {
+                $imgWidth = (int)$info[0];
+                $imgHeight = (int)$info[1];
+            }
+        }
+    }
+    if (max($imgWidth, $imgHeight) > $maxSideLimit && max($imgWidth, $imgHeight) > 0) {
+        return true;
+    }
+
+    // 3) Si no está en el registro -> pendiente
+    $norm = str_replace('\\', '/', ltrim($relPath, '/'));
+    if ($registry === null) {
+        $registry = getOptimizedRegistry();
+    }
+    if (!isset($registry[$norm])) {
+        return true;
+    }
+
+    // 4) Si está en el registro con una regla diferente (distinto max_side o quality) -> pendiente
+    $entry = $registry[$norm];
+    $regRule = $entry['regla'] ?? [];
+    if (!isset($regRule['max_side']) || !isset($regRule['quality'])) {
+        return true;
+    }
+    if ((int)$regRule['max_side'] !== $maxSideLimit || (int)$regRule['quality'] !== $qualityTarget) {
+        return true;
+    }
+
+    // Ya optimizada con la misma regla y dimensiones adecuadas
+    return false;
+}
+
