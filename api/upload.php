@@ -161,10 +161,18 @@ $filenameWithoutExt = sanitizeName(pathinfo($originalName, PATHINFO_FILENAME));
 $mimeType = mime_content_type($file['tmp_name']);
 $isImage = in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp']);
 
-// Lista blanca de extensiones
-$allowedExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'zip', 'mp4', 'txt'];
+// Lista negra fija de seguridad (nunca permitidas aunque estén en la configuración)
+$disallowedExtensions = ['php', 'phtml', 'phar', 'html', 'htm', 'js', 'sh', 'cgi', 'pl', 'py'];
+$allowedExtensions = array_map(function($e) {
+    return strtolower(trim((string)$e, " .\t\n\r\0\x0B"));
+}, (array)ALLOWED_EXTENSIONS);
 
-if (!in_array(strtolower($extension), $allowedExtensions) || $originalName === '.htaccess') {
+if (
+    $originalName === '.htaccess' ||
+    strpos($originalName, '.') === 0 ||
+    in_array($extension, $disallowedExtensions, true) ||
+    !in_array($extension, $allowedExtensions, true)
+) {
     http_response_code(400);
     echo json_encode(['error' => 'Tipo de archivo no permitido.']);
     exit;

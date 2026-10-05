@@ -30,6 +30,14 @@ return [
         // 'carpeta_privada'
     ],
 
+    // (Opcional) Lista blanca de extensiones permitidas para subida (en minúsculas, sin punto).
+    // Por motivos de seguridad, ejecutables/scripts (php, html, js, etc.) y archivos ocultos (.htaccess) están siempre bloqueados.
+    'allowed_extensions' => [
+        'jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'avif', 'ico', 'pdf',
+        'doc', 'docx', 'xls', 'xlsx', 'zip', 'mp4', 'txt', 'css', 'json',
+        'woff', 'woff2'
+    ],
+
     // Reglas de optimización de imágenes (se evalúan en orden; gana la PRIMERA que coincida).
     // Coincidencia con fnmatch insensible a mayúsculas sobre la ruta relativa a media_dir.
     'optimize_rules' => [

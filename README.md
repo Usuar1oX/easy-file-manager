@@ -12,6 +12,7 @@ Un gestor de archivos e imágenes minimalista, rápido y moderno en un solo arch
 6. (Opcional) Agrega `'hidden_files' => ['archivo.ext']` en `config.php` si deseas ocultar archivos o carpetas adicionales en el explorador y protegerlos contra edición o borrado desde la API. El sistema ya oculta y protege de forma predeterminada todos los elementos que comienzan con punto (como `.htaccess`, `.ftpquota`, etc.).
 7. (Opcional) Ajusta `'max_width'` (límite del lado mayor para fotos horizontales y verticales, por defecto 1920) y `'webp_quality'` (calidad de compresión WebP, por defecto 75).
 8. (Opcional) Configura reglas en `'optimize_rules'` para ajustar el tamaño máximo (`max_side`) y calidad (`quality`) según patrones de nombres o rutas (por ejemplo logos, iconos, portadas móviles o fotos generales).
+9. (Opcional) Configura `'allowed_extensions'` para definir la lista blanca de extensiones permitidas al subir archivos (por defecto incluye imágenes, documentos, audio/video y recursos web como `.css`, `.json`, `.woff`, `.woff2`). Por motivos de seguridad, ejecutables/scripts (`php`, `html`, `js`, etc.) y archivos ocultos (`.htaccess`) permanecen siempre bloqueados.
 
 ## Estructura
 - `index.html`: Toda la interfaz de usuario en una Single Page Application.

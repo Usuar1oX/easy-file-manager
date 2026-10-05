@@ -27,6 +27,14 @@ define('RESIZE_THRESHOLD', $config['resize_threshold'] ?? 5 * 1024 * 1024); // 5
 define('MAX_WIDTH', $config['max_width'] ?? 1920);
 define('WEBP_QUALITY', $config['webp_quality'] ?? 75);
 
+// Lista blanca de extensiones de subida configurables
+$defaultAllowedExtensions = [
+    'jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'avif', 'ico', 'pdf',
+    'doc', 'docx', 'xls', 'xlsx', 'zip', 'mp4', 'txt', 'css', 'json',
+    'woff', 'woff2'
+];
+define('ALLOWED_EXTENSIONS', is_array($config['allowed_extensions'] ?? null) ? $config['allowed_extensions'] : $defaultAllowedExtensions);
+
 // Usuarios autorizados
 $users = $config['users'] ?? ['admin' => 'admin'];
 
