@@ -1,0 +1,9 @@
+# Política de seguridad propia del gestor de imágenes.
+# El sitio que lo aloja (por ejemplo rentalcarsincancun.com) define en su .htaccess raíz una CSP
+# estricta para PageSpeed que bloquea Tailwind CDN, feather-icons y los scripts en línea de index.html.
+# Esta carpeta la reemplaza por una CSP compatible con el gestor.
+<IfModule mod_headers.c>
+  Header always unset Content-Security-Policy
+  Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+  Header set X-Robots-Tag "noindex, nofollow"
+</IfModule>

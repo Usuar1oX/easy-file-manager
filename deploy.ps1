@@ -8,6 +8,7 @@ $destDir = "e:\"
 
 # Lista de archivos que componen el proyecto
 $filesToDeploy = @(
+    ".htaccess",
     "index.html",
     "api\auth.php",
     "api\core.php",

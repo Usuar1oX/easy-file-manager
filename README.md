@@ -14,6 +14,9 @@ Un gestor de archivos e imágenes minimalista, rápido y moderno en un solo arch
 8. (Opcional) Configura reglas en `'optimize_rules'` para ajustar el tamaño máximo (`max_side`), la calidad inicial (`quality`), el peso máximo objetivo en KB (`max_kb`), la calidad mínima permitida (`min_quality`) y el límite inferior de dimensiones (`min_side`) según patrones de nombres o rutas (por ejemplo logos, iconos, portadas móviles o fotos generales). Si una imagen supera `max_kb`, la calidad baja de 5 en 5 hasta cumplirlo (sin bajar de `min_quality`) y, si aún excede el peso, reduce las dimensiones en pasos del 10% sin bajar de `min_side`.
 9. (Opcional) Configura `'allowed_extensions'` para definir la lista blanca de extensiones permitidas al subir archivos (por defecto incluye imágenes, documentos, audio/video y recursos web como `.css`, `.json`, `.woff`, `.woff2`). Por motivos de seguridad, ejecutables/scripts (`php`, `html`, `js`, etc.) y archivos ocultos (`.htaccess`) permanecen siempre bloqueados.
 
+## Sitio con CSP estricta
+Si el gestor se instala dentro de un sitio cuyo `.htaccess` raíz define una `Content-Security-Policy` estricta (por ejemplo, para PageSpeed), esa política bloquea Tailwind CDN, feather-icons y los scripts en línea, y la interfaz se ve sin formato. El archivo `.htaccess` incluido en la raíz del gestor reemplaza esa política solo para la carpeta del gestor; súbelo junto con los demás archivos.
+
 ## Estructura
 - `index.html`: Toda la interfaz de usuario en una Single Page Application.
 - `api/`: Los endpoints de backend en PHP (`auth.php`, `core.php`, `explorer.php`, `upload.php`, `optimize.php`).
