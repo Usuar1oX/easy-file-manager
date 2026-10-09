@@ -49,6 +49,7 @@ return [
         ['pattern' => '*favicon*',       'max_side' => 192,  'quality' => 80, 'min_quality' => 60, 'max_kb' => 15],
         ['pattern' => '*logo*',          'max_side' => 600,  'quality' => 80, 'min_quality' => 60, 'max_kb' => 20],
         ['pattern' => '*portada-movil*', 'max_side' => 1280, 'quality' => 70, 'min_quality' => 50, 'max_kb' => 60,  'min_side' => 1024],
+        ['pattern' => 'dominios/*/extra*', 'max_side' => 640,  'quality' => 80, 'min_quality' => 60, 'max_kb' => 40,  'min_side' => 480],
         ['pattern' => 'dominios/*',      'max_side' => 1600, 'quality' => 75, 'min_quality' => 55, 'max_kb' => 120, 'min_side' => 1280],
         ['pattern' => '*',               'max_side' => 1024, 'quality' => 70, 'min_quality' => 55, 'max_kb' => 90,  'min_side' => 720],
     ]
