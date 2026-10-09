@@ -39,13 +39,16 @@ define('ALLOWED_EXTENSIONS', is_array($config['allowed_extensions'] ?? null) ? $
 $users = $config['users'] ?? ['admin' => 'admin'];
 
 // Reglas de optimización de imágenes (patrón, lado mayor máximo y calidad)
+// max_kb: peso máximo objetivo en KB (0 = sin límite). Si la imagen supera ese peso con 'quality',
+// la calidad baja de 5 en 5 hasta 'min_quality'; si aún no cumple, las dimensiones bajan en pasos
+// del 10% sin que el lado mayor baje de 'min_side' (por defecto, igual a max_side: no se reduce).
 $defaultOptimizeRules = [
-    ['pattern' => '*icono*',         'max_side' => 192,  'quality' => 80],
-    ['pattern' => '*favicon*',       'max_side' => 192,  'quality' => 80],
-    ['pattern' => '*logo*',          'max_side' => 800,  'quality' => 80],
-    ['pattern' => '*portada-movil*', 'max_side' => 1280, 'quality' => 70],
-    ['pattern' => 'dominios/*',      'max_side' => 1600, 'quality' => 75],
-    ['pattern' => '*',               'max_side' => 1024, 'quality' => 70],
+    ['pattern' => '*icono*',         'max_side' => 192,  'quality' => 80, 'min_quality' => 60, 'max_kb' => 15],
+    ['pattern' => '*favicon*',       'max_side' => 192,  'quality' => 80, 'min_quality' => 60, 'max_kb' => 15],
+    ['pattern' => '*logo*',          'max_side' => 600,  'quality' => 80, 'min_quality' => 60, 'max_kb' => 20],
+    ['pattern' => '*portada-movil*', 'max_side' => 1280, 'quality' => 70, 'min_quality' => 50, 'max_kb' => 60,  'min_side' => 1024],
+    ['pattern' => 'dominios/*',      'max_side' => 1600, 'quality' => 75, 'min_quality' => 55, 'max_kb' => 120, 'min_side' => 1280],
+    ['pattern' => '*',               'max_side' => 1024, 'quality' => 70, 'min_quality' => 55, 'max_kb' => 90,  'min_side' => 720],
 ];
 $optimizeRules = $config['optimize_rules'] ?? $defaultOptimizeRules;
 if (!is_array($optimizeRules)) {
@@ -60,14 +63,84 @@ function getOptimizeRuleForPath($relativePath) {
         if (!isset($rule['pattern'])) continue;
         $pattern = $rule['pattern'];
         if (fnmatch($pattern, $norm, $flags) || fnmatch(mb_strtolower($pattern, 'UTF-8'), mb_strtolower($norm, 'UTF-8'))) {
+            $quality = (int)($rule['quality'] ?? 70);
             return [
                 'pattern' => $rule['pattern'],
                 'max_side' => (int)($rule['max_side'] ?? 1024),
-                'quality' => (int)($rule['quality'] ?? 70),
+                'quality' => $quality,
+                'min_quality' => min($quality, (int)($rule['min_quality'] ?? $quality)),
+                'max_kb' => max(0, (int)($rule['max_kb'] ?? 0)),
+                'min_side' => (int)($rule['min_side'] ?? ($rule['max_side'] ?? 1024)),
             ];
         }
     }
-    return ['pattern' => '*', 'max_side' => 1024, 'quality' => 70];
+    return ['pattern' => '*', 'max_side' => 1024, 'quality' => 70, 'min_quality' => 55, 'max_kb' => 90, 'min_side' => 720];
+}
+
+/**
+ * Codifica $image como WebP en $destFile respetando el peso máximo de la regla (max_kb).
+ * 1) Empieza con $rule['quality'] y baja la calidad de 5 en 5 hasta $rule['min_quality'].
+ * 2) Si con la calidad mínima aún supera max_kb, reduce las dimensiones en pasos del 10%
+ *    (sin bajar el lado mayor de $rule['min_side']) y vuelve a codificar con calidad mínima.
+ * Las fotos con mucho detalle (selva, ruinas) casi no bajan de peso solo con calidad;
+ * reducir un poco las dimensiones es lo que realmente las aligera.
+ * $outW/$outH reciben las dimensiones finales. Devuelve la calidad final, o false si falló.
+ */
+function encodeWebpWithinBudget($image, $destFile, $rule, &$outW = null, &$outH = null) {
+    $quality = (int)($rule['quality'] ?? 70);
+    $minQuality = min($quality, (int)($rule['min_quality'] ?? $quality));
+    $maxBytes = max(0, (int)($rule['max_kb'] ?? 0)) * 1024;
+    $width = imagesx($image);
+    $height = imagesy($image);
+    $minSide = (int)($rule['min_side'] ?? max($width, $height));
+    $outW = $width;
+    $outH = $height;
+
+    $fits = function () use ($destFile, $maxBytes) {
+        clearstatcache(true, $destFile);
+        $size = @filesize($destFile);
+        return $size !== false && ($maxBytes <= 0 || $size <= $maxBytes);
+    };
+
+    // 1) Bajar calidad
+    while (true) {
+        if (!imagewebp($image, $destFile, $quality)) {
+            return false;
+        }
+        if ($fits() || $quality <= $minQuality) {
+            break;
+        }
+        $quality = max($minQuality, $quality - 5);
+    }
+    if ($fits()) {
+        return $quality;
+    }
+
+    // 2) Reducir dimensiones en pasos del 10% sin bajar de min_side
+    $maxSide = max($width, $height);
+    for ($scale = 0.9; $scale >= 0.5; $scale -= 0.1) {
+        $w = (int)round($width * $scale);
+        $h = (int)round($height * $scale);
+        if (max($w, $h) < $minSide || $w < 1 || $h < 1) {
+            break;
+        }
+        $scaled = imagecreatetruecolor($w, $h);
+        imagealphablending($scaled, false);
+        imagesavealpha($scaled, true);
+        imagefilledrectangle($scaled, 0, 0, $w, $h, imagecolorallocatealpha($scaled, 255, 255, 255, 127));
+        imagecopyresampled($scaled, $image, 0, 0, 0, 0, $w, $h, $width, $height);
+        $ok = imagewebp($scaled, $destFile, $minQuality);
+        imagedestroy($scaled);
+        if (!$ok) {
+            return false;
+        }
+        $outW = $w;
+        $outH = $h;
+        if ($fits()) {
+            break;
+        }
+    }
+    return $minQuality;
 }
 
 // Archivos o carpetas ocultos
@@ -410,6 +483,20 @@ function isImagePendingOptimization($relPath, $fullPath = null, $rule = null, $r
     }
     if (!isset($registry[$norm])) {
         return true;
+    }
+
+    // 3b) Si pesa más que el max_kb de su regla -> pendiente, salvo que ya se haya
+    //     intentado con la calidad mínima de esa misma regla (no se puede bajar más)
+    $maxKb = (int)($rule['max_kb'] ?? 0);
+    if ($maxKb > 0 && $fullPath && file_exists($fullPath) && filesize($fullPath) > $maxKb * 1024) {
+        $entryQ = $registry[$norm]['calidad_final'] ?? null;
+        $entryRule = $registry[$norm]['regla'] ?? [];
+        $minQ = (int)($rule['min_quality'] ?? $qualityTarget);
+        $triedAtMin = $entryQ !== null && (int)$entryQ <= $minQ
+            && (int)($entryRule['max_kb'] ?? 0) === $maxKb;
+        if (!$triedAtMin) {
+            return true;
+        }
     }
 
     // 4) Si está en el registro con una regla diferente (distinto max_side o quality) -> pendiente

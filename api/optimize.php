@@ -168,6 +168,9 @@ if ($action === 'analyze') {
         if ($estSize >= $size) {
             $estSize = (int)round($size * 0.90);
         }
+        if (!empty($rule['max_kb'])) {
+            $estSize = min($estSize, (int)$rule['max_kb'] * 1024);
+        }
         if ($estSize <= 0) $estSize = 1;
 
         $hasBackup = file_exists(MEDIA_DIR . '/.originales/' . $subPath);
@@ -290,7 +293,9 @@ if ($action === 'analyze') {
 
             // Archivo temporal oculto en la MISMA carpeta para reemplazo atómico con rename()
             $tmpFile = dirname($fullPath) . '/.opt_' . uniqid() . '.webp';
-            $encoded = imagewebp($destImage, $tmpFile, $quality);
+            // Codifica respetando el peso máximo (max_kb) de la regla, bajando la calidad si hace falta
+            $finalQuality = encodeWebpWithinBudget($destImage, $tmpFile, $rule, $newWidth, $newHeight);
+            $encoded = ($finalQuality !== false);
 
             imagedestroy($sourceImage);
             imagedestroy($destImage);
@@ -350,6 +355,7 @@ if ($action === 'analyze') {
                 updateOptimizedRegistryEntry($finalRelPath, [
                     'fecha' => date('c'),
                     'regla' => $rule,
+                    'calidad_final' => $finalQuality,
                     'peso_antes' => $oldSize,
                     'peso_despues' => $newSize,
                     'original_convertido' => $relPath
@@ -376,8 +382,10 @@ if ($action === 'analyze') {
                 // CASO 2: WEBP -> Optimizar conservando nombre y ruta
                 $threshold = $oldSize * 0.90; // Debe pesar al menos 10% menos o requerir redimensionamiento
                 $needsResize = ($maxSide > $maxSideLimit);
+                // Si supera el peso máximo de su regla, cualquier reducción se acepta
+                $overBudget = ((int)($rule['max_kb'] ?? 0) > 0) && ($oldSize > (int)$rule['max_kb'] * 1024);
 
-                if ($newSize <= $threshold || $needsResize || $force) {
+                if ($newSize <= $threshold || $needsResize || $force || ($overBudget && $newSize < $oldSize)) {
                     // Si el nuevo tamaño es menor, aplicamos el reemplazo
                     if ($newSize < $oldSize || $needsResize) {
                         $backupPath = MEDIA_DIR . '/.originales/' . $relPath;
@@ -404,6 +412,7 @@ if ($action === 'analyze') {
                         updateOptimizedRegistryEntry($relPath, [
                             'fecha' => date('c'),
                             'regla' => $rule,
+                            'calidad_final' => $finalQuality,
                             'peso_antes' => $oldSize,
                             'peso_despues' => $newSize
                         ]);
@@ -427,6 +436,7 @@ if ($action === 'analyze') {
                         updateOptimizedRegistryEntry($relPath, [
                             'fecha' => date('c'),
                             'regla' => $rule,
+                            'calidad_final' => $finalQuality,
                             'peso_antes' => $oldSize,
                             'peso_despues' => $oldSize,
                             'skipped' => true
@@ -449,6 +459,7 @@ if ($action === 'analyze') {
                     updateOptimizedRegistryEntry($relPath, [
                         'fecha' => date('c'),
                         'regla' => $rule,
+                        'calidad_final' => $finalQuality,
                         'peso_antes' => $oldSize,
                         'peso_despues' => $oldSize,
                         'skipped' => true

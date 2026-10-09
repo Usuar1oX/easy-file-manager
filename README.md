@@ -11,7 +11,7 @@ Un gestor de archivos e imágenes minimalista, rápido y moderno en un solo arch
 5. (Opcional) Cambia la ruta `media_dir` en `config.php` para decidir dónde se guardan físicamente los archivos. Por defecto los guardará en la misma carpeta raíz.
 6. (Opcional) Agrega `'hidden_files' => ['archivo.ext']` en `config.php` si deseas ocultar archivos o carpetas adicionales en el explorador y protegerlos contra edición o borrado desde la API. El sistema ya oculta y protege de forma predeterminada todos los elementos que comienzan con punto (como `.htaccess`, `.ftpquota`, etc.).
 7. (Opcional) Ajusta `'max_width'` (límite del lado mayor para fotos horizontales y verticales, por defecto 1920) y `'webp_quality'` (calidad de compresión WebP, por defecto 75).
-8. (Opcional) Configura reglas en `'optimize_rules'` para ajustar el tamaño máximo (`max_side`) y calidad (`quality`) según patrones de nombres o rutas (por ejemplo logos, iconos, portadas móviles o fotos generales).
+8. (Opcional) Configura reglas en `'optimize_rules'` para ajustar el tamaño máximo (`max_side`), la calidad inicial (`quality`), el peso máximo objetivo en KB (`max_kb`), la calidad mínima permitida (`min_quality`) y el límite inferior de dimensiones (`min_side`) según patrones de nombres o rutas (por ejemplo logos, iconos, portadas móviles o fotos generales). Si una imagen supera `max_kb`, la calidad baja de 5 en 5 hasta cumplirlo (sin bajar de `min_quality`) y, si aún excede el peso, reduce las dimensiones en pasos del 10% sin bajar de `min_side`.
 9. (Opcional) Configura `'allowed_extensions'` para definir la lista blanca de extensiones permitidas al subir archivos (por defecto incluye imágenes, documentos, audio/video y recursos web como `.css`, `.json`, `.woff`, `.woff2`). Por motivos de seguridad, ejecutables/scripts (`php`, `html`, `js`, etc.) y archivos ocultos (`.htaccess`) permanecen siempre bloqueados.
 
 ## Estructura
@@ -23,7 +23,8 @@ Un gestor de archivos e imágenes minimalista, rápido y moderno en un solo arch
 - Redimensionamiento proporcional por el lado mayor (horizontal y vertical).
 - Herramienta **Optimizar imágenes** unificada:
   - Convierte automáticamente imágenes `.jpg`/`.jpeg`/`.png` a formato WebP conservando una copia del original en `.originales`.
-  - Optimiza imágenes `.webp` existentes según las reglas `optimize_rules` aplicables por patrón de nombre o ruta.
+  - Optimiza imágenes `.webp` existentes según las reglas `optimize_rules` aplicables por patrón de nombre o ruta, conservando nombre y ruta.
+  - Peso máximo por regla (`max_kb`): las imágenes que lo superan se marcan como pendientes y se recomprimen con calidad descendente (hasta `min_quality`) y reducción gradual de dimensiones (hasta `min_side`) hasta cumplirlo.
   - Registro atómico concurrente en `MEDIA_DIR/.originales/.optimizadas.json` (evita dobles optimizaciones innecesarias).
   - Indicador visual **"Sin optimizar"** en miniaturas y contador de pendientes en la barra superior.
   - Soporte para **"Optimizar selección"** (carpetas e imágenes por lotes de 10) con progreso en vivo y botón de cancelación segura.

@@ -229,7 +229,6 @@ if ($isImage) {
         $relativeFilePath = $relativeDirPath === '' ? $finalName : $relativeDirPath . '/' . $finalName;
         $rule = getOptimizeRuleForPath($relativeFilePath);
         $maxSideLimit = (int)$rule['max_side'];
-        $uploadQuality = (int)$rule['quality'];
 
         // Redimensionar por el lado mayor al max_side de la regla (sin agrandar)
         $maxSide = max($width, $height);
@@ -258,7 +257,9 @@ if ($isImage) {
             $width, $height
         );
 
-        $success = imagewebp($destinationImage, $finalPath, $uploadQuality);
+        // Codifica respetando el peso máximo (max_kb) de la regla, bajando la calidad si hace falta
+        $uploadFinalQuality = encodeWebpWithinBudget($destinationImage, $finalPath, $rule, $newWidth, $newHeight);
+        $success = ($uploadFinalQuality !== false);
 
         imagedestroy($sourceImage);
         imagedestroy($destinationImage);
@@ -279,6 +280,7 @@ if ($success) {
         updateOptimizedRegistryEntry($relativePath, [
             'fecha' => date('c'),
             'regla' => $rule,
+            'calidad_final' => $uploadFinalQuality ?? null,
             'peso_antes' => $file['size'] ?? 0,
             'peso_despues' => $finalSize
         ]);
